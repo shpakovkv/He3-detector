@@ -37,11 +37,14 @@ def file_processing(filename,
 
     if verbose > 0:
         rates, err_rates, gaps = get_counting_rate(data, verbose)
-        rates_str = ", ".join("{:.4f} ±{:.4f}".format(val, err) for val, err in zip(rates, err_rates))
+        rates_str = ",  ".join("{:.4f}".format(val) for val in rates)
+        err_rates_str = ", ".join("±{:.4f}".format(err) for err in err_rates)
         if group_by_4:
             print("Средний счет (сумма по 4) [1/с] = [{}]".format(rates_str))
+            print("Погрешность вычисления [1/с]    = [{}]".format(err_rates_str))
         else:
-            print("Средний счет по каналам [1/с] = {}".format(rates_str))
+            print("Средний счет по каналам [1/с] = [{}]".format(rates_str))
+            print("Погрешность вычисления [1/с]  = [{}]".format(err_rates_str))
         # print(", Погрешность [1/с] = {}".format(err_rates))
 
         print("Длительность регистрации: {} сек. Количество записей: {}."
@@ -71,10 +74,13 @@ def file_processing(filename,
         data = get_average_by_time_interval(data, group_by_sec, include_tail=True, verbose=verbose)
 
     base_out_name = os.path.dirname(filename)
+    fname = os.path.basename(filename)
     if group_by_sec > 0:
-        base_out_name = os.path.join(base_out_name, filename + "_sum_by_{}_sec".format(group_by_sec))
+        base_out_name = os.path.join(base_out_name, fname + "_sum_by_{}_sec".format(group_by_sec))
+    elif group_by_4:
+        base_out_name = os.path.join(base_out_name, fname + "_sum")
     else:
-        base_out_name = os.path.join(base_out_name, filename + "_sum")
+        base_out_name = os.path.join(base_out_name, "graph_1-4_and_9-12", fname)
 
     if save_data:
         save_as = base_out_name + ".csv"
@@ -87,15 +93,30 @@ def file_processing(filename,
 
     save_graph_as = None
     if save_graph:
-        save_graph_as = base_out_name + ".png"
-
+        save_graph_as = base_out_name
     if make_graph:
         scatter_graph = False
         if group_by_sec:
             scatter_graph = True
-        graph_all(data, [1, 0, 1], labels=["Ch1-4", "", "Ch9-12"], save_as=save_graph_as, scatter=scatter_graph)
+        if group_by_4:
+            if save_graph:
+                save_graph_as += ".png"
+            graph_all(data, [1, 0, 1], labels=["Ch1-4", "", "Ch9-12"], save_as=save_graph_as, scatter=scatter_graph)
+        else:
+            graph_all(data, [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+                      labels=["Ch1", "Ch2", "Ch3", "Ch4", "", "", "", "", "", "", "", ""],
+                      save_as=save_graph_as + "_Ch1-4.png",
+                      scatter=scatter_graph)
+            graph_all(data, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
+                      labels=["", "", "", "", "", "", "", "", "Ch9", "Ch10", "Ch11", "Ch12", ],
+                      save_as=save_graph_as + "_Ch9-12.png",
+                      scatter=scatter_graph)
         if verbose > 1 and save_graph_as is not None:
-            print("График сохранен: {}".format(os.path.basename(save_graph_as)))
+            if group_by_4:
+                print("График сохранен: {}".format(os.path.basename(save_graph_as)))
+            else:
+                print("График сохранен: {}".format(os.path.basename(save_graph_as + "_Ch1-4.png")))
+                print("График сохранен: {}".format(os.path.basename(save_graph_as + "_Ch9-12.png")))
 
     # graph_all(data_grouped_by_4, [1, 0, 1], labels=["Sum 1+2+3+4", "", "Sum 9+10+11+12"])
     # graph_all(data_grouped_by_4, [1, 0, 1], labels=["Ch1-4", "", "Ch9-12"])
