@@ -13,7 +13,7 @@ def convert_time(time, unixtime):
     return time
 
 
-def graph_all(data, mask=None, unixtime=True, labels=None, save_as=None, show_graph=False, scatter=False):
+def graph_k15(data, mask=None, unixtime=True, labels=None, save_as=None, show_graph=False, scatter=False):
     if data.shape[1] == 1:
         scatter = True
 

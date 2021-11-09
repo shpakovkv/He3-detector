@@ -16,6 +16,10 @@ import numpy as np
 import datetime
 
 
+SLOW_CONTROL_DATA_COLUMNS = 11
+SC_VAL_POS = {"voltage": 0, "current": 2}
+
+
 def get_raw_lines(filename):
     lines = None
     with open(filename, 'r') as fid:
@@ -26,15 +30,12 @@ def get_raw_lines(filename):
 def get_col_num(raw_line):
     pattern = '([^\s]+)'
     cols = re.findall(pattern, raw_line)
-
-    # -1 because date and time are separated
-    return len(cols) - 1
+    return len(cols)
 
 
 def get_date(raw_line):
     date_separator = '.'
-    date_pattern = '(\d+[\.][\d\.:]+)'
-
+    date_pattern = '[\d]+[\.][\d]+[\.][\d]+'
     date = re.findall(date_pattern, raw_line)
     assert len(date) > 0, "No date stamp found in line '{}'".format(raw_line)
     assert len(date) < 2, "Too many date stamp found in line '{}'".format(raw_line)
@@ -45,8 +46,7 @@ def get_date(raw_line):
 
 def get_time(raw_line):
     time_separator = ':'
-    time_pattern = '(\d+[:][\d\.:]+)'
-
+    time_pattern = '([\d]+[:][\d]+[:][\d]+)'
     time = re.findall(time_pattern, raw_line)
     assert len(time) > 0, "No time stamp found in line '{}'".format(raw_line)
     assert len(time) < 2, "Too many time stamp found in line '{}'".format(raw_line)
@@ -62,31 +62,67 @@ def get_time_stamp(raw_line):
     return date_and_time.timestamp()
 
 
-def get_tail_w_counts(raw_line):
+def get_k15_line_tail(raw_line):
     pattern = '(\s[\d\s]+)$'
     match = re.search(pattern, raw_line)
     line_tail = match.group(0).strip()
     return line_tail
 
 
-def get_signals_data(raw_lines):
+def get_k15_data(raw_lines):
     rows = get_col_num(raw_lines[0])
+    # -1 because date and time are separated
+    rows -= 1
     points = len(raw_lines)
     data = np.ndarray(shape=(rows, points), dtype=np.int64)
     for point, raw_line in enumerate(raw_lines):
         timestamp = get_time_stamp(raw_line)
         data[0, point] = timestamp
-        line_tail = get_tail_w_counts(raw_line)
+        line_tail = get_k15_line_tail(raw_line)
         for row, val in enumerate(int(word) for word in line_tail.split()):
             # keep first row for timestamp
             data[row + 1, point] = val
     return data
 
 
+def get_slow_control_values(raw_line):
+    pattern = '\s([+-]?[0-9]+[.][0-9]+)\s'
+    values = re.findall(pattern, raw_line)
+    return values
+
+
+def get_slow_control_data(raw_lines):
+    rows = 0
+    for line in raw_lines:
+        rows = get_col_num(line)
+        if rows > 1:
+            assert rows == SLOW_CONTROL_DATA_COLUMNS, \
+                "Wrong number of data columns. Expected {}, got {}." \
+                "".format(SLOW_CONTROL_DATA_COLUMNS, rows)
+            break
+    # -1 because date and time are separated
+    rows -= 1
+
+    # store 3 values (datetime, voltage, current)
+    rows_to_store = 3
+
+    raw_lines = [line for line in raw_lines if get_col_num(line) > 1]
+    points = len(raw_lines)
+    data = np.ndarray(shape=(rows_to_store, points), dtype=np.int32)
+
+    for point, raw_line in enumerate(raw_lines):
+        timestamp = get_time_stamp(raw_line)
+        data[0, point] = timestamp
+        values = get_slow_control_values(raw_line)
+        data[1, point] = int(float(values[SC_VAL_POS["voltage"]]) * 1000)
+        data[2, point] = int(float(values[SC_VAL_POS["current"]]) * 1000)
+    return data
+
+
 def test():
     filename = "Cf252-12-03-2021"
     raw_lines = get_raw_lines(filename)
-    data_array = get_signals_data(raw_lines)
+    data_array = get_k15_data(raw_lines)
     delimiter = ','
     for idx in range(data_array.shape[1]):
         print(delimiter.join(str(val) for val in data_array[:, idx]))
@@ -115,7 +151,7 @@ def main():
 
     # read
     raw_lines = get_raw_lines(sys.argv[1])
-    data = get_signals_data(raw_lines)
+    data = get_k15_data(raw_lines)
 
     # save
     # np.savetxt()
@@ -124,5 +160,5 @@ def main():
 
 
 if __name__ == "__main__":
-    # main()
-    test()
+    main()
+    # test()

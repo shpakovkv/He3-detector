@@ -1,7 +1,7 @@
 import numpy as np
 from numba import njit, vectorize, float64
-from k15reader import get_raw_lines, get_signals_data
-from he3graph import graph_all
+from k15reader import get_raw_lines, get_k15_data
+from he3graph import graph_k15
 from file_handler import save_signals_csv
 import os
 import datetime
@@ -27,7 +27,7 @@ def file_processing(filename,
         print("Файл \"{}\"".format(os.path.basename(filename)))
 
     raw_lines = get_raw_lines(filename)
-    data = get_signals_data(raw_lines)
+    data = get_k15_data(raw_lines)
 
     if filter128:
         filter_128(data)
@@ -101,13 +101,13 @@ def file_processing(filename,
         if group_by_4:
             if save_graph:
                 save_graph_as += ".png"
-            graph_all(data, [1, 0, 1], labels=["Ch1-4", "", "Ch9-12"], save_as=save_graph_as, scatter=scatter_graph)
+            graph_k15(data, [1, 0, 1], labels=["Ch1-4", "", "Ch9-12"], save_as=save_graph_as, scatter=scatter_graph)
         else:
-            graph_all(data, [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+            graph_k15(data, [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
                       labels=["Ch1", "Ch2", "Ch3", "Ch4", "", "", "", "", "", "", "", ""],
                       save_as=save_graph_as + "_Ch1-4.png",
                       scatter=scatter_graph)
-            graph_all(data, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
+            graph_k15(data, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
                       labels=["", "", "", "", "", "", "", "", "Ch9", "Ch10", "Ch11", "Ch12", ],
                       save_as=save_graph_as + "_Ch9-12.png",
                       scatter=scatter_graph)
