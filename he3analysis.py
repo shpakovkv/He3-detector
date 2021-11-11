@@ -1,3 +1,11 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+"""He3 readout system data analysis and statistics.
+
+Author: Konstantin Shpakov, march 2021.
+"""
+import matplotlib.pyplot as plt
 import numpy as np
 from numba import njit, vectorize, float64
 from k15reader import get_raw_lines, get_k15_data
@@ -36,93 +44,110 @@ def file_processing(filename,
         data = get_sum_by_number_of_channels(data, 4)
 
     if verbose > 0:
-        rates, err_rates, gaps = get_counting_rate(data, verbose)
-        rates_str = ",  ".join("{:.4f}".format(val) for val in rates)
-        err_rates_str = ", ".join("±{:.4f}".format(err) for err in err_rates)
-        if group_by_4:
-            print("Средний счет (сумма по 4) [1/с] = [{}]".format(rates_str))
-            print("Погрешность вычисления [1/с]    = [{}]".format(err_rates_str))
-        else:
-            print("Средний счет по каналам [1/с] = [{}]".format(rates_str))
-            print("Погрешность вычисления [1/с]  = [{}]".format(err_rates_str))
-        # print(", Погрешность [1/с] = {}".format(err_rates))
-
-        print("Длительность регистрации: {} сек. Количество записей: {}."
-              "".format(data[0, -1] - data[0, 0] + (data[0, 1] - data[0, 0]), data.shape[1]))
-        if gaps:
-            print("Присутствуют пропуски ({} шт) длительностью: {} сек"
-                  "".format(len(gaps), gaps))
-
-        # time spent from 1st record to last
-        # (!!) registration time of the 1st event is not included
-        time_spent = data[0, -1] - data[0, 0]
-
-        # number of records made during time_spent
-        records_num = data.shape[1] - 1
-
-        real_time_per_record = time_spent / records_num
-
-        err_real_time_per_records = (time_spent + 1) / records_num - real_time_per_record
-        if real_time_per_record > DEFAULT_SEC_PER_RECORD * ERR_COEF:
-            print("WARNING! Calculated time-per-record {:.4f} significantly exceeds the default value {:.4f}."
-                  "".format(real_time_per_record, DEFAULT_SEC_PER_RECORD))
-        if verbose > 1:
-            print("Длительность одной записи: {:.4f} сек ±{:.6f} сек"
-                  "".format(real_time_per_record, err_real_time_per_records))
+        print_rates(data, group_by_4, verbose)
 
     if group_by_sec > 0:
         data = get_average_by_time_interval(data, group_by_sec, include_tail=True, verbose=verbose)
 
-    base_out_name = os.path.dirname(filename)
-    fname = os.path.basename(filename)
+    base_out_name = get_base_output_fname(filename, group_by_4, group_by_sec)
+    if save_data:
+        write_data(data, base_out_name, group_by_sec, verbose)
+
+    if make_graph:
+        make_k15_graph(data, group_by_4, group_by_sec, base_out_name, save_graph, show_graph, verbose)
+
+    # graph_name = os.path.join(base_out_name, "graph_1-4_and_9-12", base_out_name)
+    # graph_all(data_grouped_by_4, [1, 0, 1], labels=["Sum 1+2+3+4", "", "Sum 9+10+11+12"])
+    # graph_all(data_grouped_by_4, [1, 0, 1], labels=["Ch1-4", "", "Ch9-12"])
+
+
+def print_rates(data, group_by_4, verbose):
+    rates, err_rates, gaps = get_counting_rate(data, verbose=verbose)
+    rates_str = ",  ".join("{:.4f}".format(val) for val in rates)
+    err_rates_str = ", ".join("±{:.4f}".format(err) for err in err_rates)
+    if group_by_4:
+        print("Средний счет (сумма по 4) [1/с] = [{}]".format(rates_str))
+        print("Погрешность вычисления [1/с]    = [{}]".format(err_rates_str))
+    else:
+        print("Средний счет по каналам [1/с] = [{}]".format(rates_str))
+        print("Погрешность вычисления [1/с]  = [{}]".format(err_rates_str))
+    # print(", Погрешность [1/с] = {}".format(err_rates))
+
+    print("Длительность регистрации: {} сек. Количество записей: {}."
+          "".format(data[0, -1] - data[0, 0] + (data[0, 1] - data[0, 0]), data.shape[1]))
+    if gaps:
+        print("Присутствуют пропуски ({} шт) длительностью: {} сек"
+              "".format(len(gaps), gaps))
+
+    # time spent from 1st record to last
+    # (!!) registration time of the 1st event is not included
+    time_spent = data[0, -1] - data[0, 0]
+
+    # number of records made during time_spent
+    records_num = data.shape[1] - 1
+
+    real_time_per_record = time_spent / records_num
+
+    err_real_time_per_records = (time_spent + 1) / records_num - real_time_per_record
+    if real_time_per_record > DEFAULT_SEC_PER_RECORD * ERR_COEF:
+        print("WARNING! Calculated time-per-record {:.4f} significantly exceeds the default value {:.4f}."
+              "".format(real_time_per_record, DEFAULT_SEC_PER_RECORD))
+    if verbose > 1:
+        print("Длительность одной записи: {:.4f} сек ±{:.6f} сек"
+              "".format(real_time_per_record, err_real_time_per_records))
+
+
+def get_base_output_fname(source_filename, group_by_4, group_by_sec):
+    base_out_name = os.path.dirname(source_filename)
+    fname = os.path.basename(source_filename)
     if group_by_sec > 0:
         base_out_name = os.path.join(base_out_name, fname + "_sum_by_{}_sec".format(group_by_sec))
     elif group_by_4:
         base_out_name = os.path.join(base_out_name, fname + "_sum")
     else:
         base_out_name = os.path.join(base_out_name, "graph_1-4_and_9-12", fname)
+    return base_out_name
 
-    if save_data:
-        save_as = base_out_name + ".csv"
-        if group_by_sec > 0:
-            save_signals_csv(save_as, data, integer=False)
-        else:
-            save_signals_csv(save_as, data, integer=True)
-        if verbose > 1:
-            print("Данные сохранены: {}".format(os.path.basename(save_as)))
 
+def write_data(data, base_out_name, group_by_sec, verbose):
+    save_as = base_out_name + ".csv"
+    if group_by_sec > 0:
+        # averaging gives floating point values
+        save_signals_csv(save_as, data, integer=False)
+    else:
+        save_signals_csv(save_as, data, integer=True)
+    if verbose > 1:
+        print("Данные сохранены: {}".format(os.path.basename(save_as)))
+
+
+def make_k15_graph(data, group_by_4, group_by_sec, base_out_name, save_graph, show_graph, verbose):
     save_graph_as = None
     if save_graph:
         save_graph_as = base_out_name
-    if make_graph:
-        scatter_graph = False
-        if group_by_sec:
-            scatter_graph = True
+    scatter_graph = False
+    if group_by_sec:
+        scatter_graph = True
+    if group_by_4:
+        if save_graph:
+            save_graph_as += ".png"
+        graph_k15(data, [1, 0, 1], labels=["Ch1-4", "", "Ch9-12"], save_as=save_graph_as, scatter=scatter_graph)
+    else:
+        graph_k15(data, [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+                  labels=["Ch1", "Ch2", "Ch3", "Ch4", "", "", "", "", "", "", "", ""],
+                  save_as=save_graph_as + "_Ch1-4.png",
+                  scatter=scatter_graph)
+        graph_k15(data, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
+                  labels=["", "", "", "", "", "", "", "", "Ch9", "Ch10", "Ch11", "Ch12", ],
+                  save_as=save_graph_as + "_Ch9-12.png",
+                  scatter=scatter_graph)
+    if verbose > 1 and save_graph_as is not None:
         if group_by_4:
-            if save_graph:
-                save_graph_as += ".png"
-            graph_k15(data, [1, 0, 1], labels=["Ch1-4", "", "Ch9-12"], save_as=save_graph_as, scatter=scatter_graph)
+            print("График сохранен: {}".format(os.path.basename(save_graph_as)))
         else:
-            graph_k15(data, [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-                      labels=["Ch1", "Ch2", "Ch3", "Ch4", "", "", "", "", "", "", "", ""],
-                      save_as=save_graph_as + "_Ch1-4.png",
-                      scatter=scatter_graph)
-            graph_k15(data, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
-                      labels=["", "", "", "", "", "", "", "", "Ch9", "Ch10", "Ch11", "Ch12", ],
-                      save_as=save_graph_as + "_Ch9-12.png",
-                      scatter=scatter_graph)
-        if verbose > 1 and save_graph_as is not None:
-            if group_by_4:
-                print("График сохранен: {}".format(os.path.basename(save_graph_as)))
-            else:
-                print("График сохранен: {}".format(os.path.basename(save_graph_as + "_Ch1-4.png")))
-                print("График сохранен: {}".format(os.path.basename(save_graph_as + "_Ch9-12.png")))
-
-    # graph_all(data_grouped_by_4, [1, 0, 1], labels=["Sum 1+2+3+4", "", "Sum 9+10+11+12"])
-    # graph_all(data_grouped_by_4, [1, 0, 1], labels=["Ch1-4", "", "Ch9-12"])
-
-    if verbose > 1:
-        print()
+            print("График сохранен: {}".format(os.path.basename(save_graph_as + "_Ch1-4.png")))
+            print("График сохранен: {}".format(os.path.basename(save_graph_as + "_Ch9-12.png")))
+    if show_graph:
+        plt.show()
 
 
 @njit()
