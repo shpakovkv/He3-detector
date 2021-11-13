@@ -108,7 +108,7 @@ def get_slow_control_data(raw_lines):
 
     raw_lines = [line for line in raw_lines if get_col_num(line) > 1]
     points = len(raw_lines)
-    data = np.ndarray(shape=(rows_to_store, points), dtype=np.int32)
+    data = np.zeros(shape=(rows_to_store, points), dtype=np.int32)
 
     for point, raw_line in enumerate(raw_lines):
         timestamp = get_time_stamp(raw_line)
