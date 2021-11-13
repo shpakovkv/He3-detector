@@ -175,19 +175,19 @@ def get_average_by_time_interval(data, group_by_sec, sec_per_record=DEFAULT_SEC_
     @njit()
     def fill_value_rows(dest, source, group_by_sec):
         old_len = source.shape[1]
-        interval_start = 0
-        interval_stop = 0
+        left_border = 0
+        right_border = 1
         for pt in range(dest.shape[1]):
-            start_time = source[0, interval_start]
+            start_time = source[0, left_border]
             stop_time = start_time
-            while stop_time - start_time < group_by_sec:
-                interval_stop += 1
-                if interval_stop == source.shape[1]:
+            while stop_time - start_time <= group_by_sec:
+                right_border += 1
+                if right_border == source.shape[1]:
                     break
-                stop_time = source[0, interval_stop]
+                stop_time = source[0, right_border]
             for ch in range(1, dest.shape[0]):
-                dest[ch, pt] = np.sum(source[ch, interval_start: interval_stop]) / group_by_sec
-            interval_start = interval_stop
+                dest[ch, pt] = np.sum(source[ch, left_border: right_border]) / (right_border - left_border)
+            left_border = right_border
         return dest
 
     @njit()
@@ -227,11 +227,12 @@ def get_average_by_time_interval(data, group_by_sec, sec_per_record=DEFAULT_SEC_
         print("{} групп по {} сек.".format(new_data.shape[1], group_by_sec), end="")
     if include_tail and there_is_tail:
         tail = np.zeros(shape=(data.shape[0], 1), dtype=data.dtype)
-        tail[0, 0] = (data[0, tail_start] + data[0, -1]) // 2
+        # simple solution "(data[0, tail_start] + data[0, -1]) // 2" may overflow in timestamp (for int32 format)
+        tail[0, 0] = data[0, tail_start] // 2 + data[0, -1] // 2 + (data[0, tail_start] % 2 + data[0, -1] % 2) // 2
         duration = data[0, -1] - data[0, tail_start]
         duration += sec_per_record
         for ch in range(1, data.shape[0]):
-            tail[ch, 0] = np.sum(data[ch, tail_start:]) / duration
+            tail[ch, 0] = np.sum(data[ch, tail_start:]) / tail_points
         new_data = np.concatenate((new_data, tail), axis=1)
         if verbose > 0:
             print(", а также 'хвост' длительностью {} сек.".format(duration), end="")
@@ -244,7 +245,7 @@ def get_average_by_time_interval(data, group_by_sec, sec_per_record=DEFAULT_SEC_
     return new_data
 
 
-def get_counting_rate(data, verbose=0, sec_per_record=DEFAULT_SEC_PER_RECORD):
+def get_counting_rate(data, sec_per_record=DEFAULT_SEC_PER_RECORD):
     # time spent from 1st record to last
     # (!!) registration time of the 1st event is not included
     duration = data[0, -1] - data[0, 0]
