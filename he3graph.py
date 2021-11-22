@@ -1,20 +1,16 @@
 import sys
 import os
 import numpy as np
+from k15reader import get_raw_lines, get_k15_data, get_slow_control_data
+from he3analysis import convert_time
 
 from matplotlib import pyplot as plt
 from matplotlib import dates as md
 import datetime
 
 
-def convert_time(time, unixtime):
-    if unixtime:
-        return md.epoch2num(time)
-    return time
-
-
 def graph_k15(data, mask=None, unixtime=True, labels=None, save_as=None, show_graph=False, scatter=False):
-    plt.close()
+    plt.close('all')
     if data.shape[1] == 1:
         scatter = True
 
@@ -67,7 +63,7 @@ def graph_k15(data, mask=None, unixtime=True, labels=None, save_as=None, show_gr
 
 
 def graph_k15_and_sc(data_k15, data_sc, data_sc_avg=None, mask=None, unixtime=True, labels=None, save_as=None, show_graph=False, scatter=False):
-    plt.close()
+    plt.close('all')
     if data_k15.shape[1] == 1:
         scatter = True
 
@@ -76,8 +72,11 @@ def graph_k15_and_sc(data_k15, data_sc, data_sc_avg=None, mask=None, unixtime=Tr
         line_fmt = 's-'
 
     k15_channels = data_k15.shape[0] - 1
-    if mask is None:
-        mask = [1] * k15_channels
+    if mask is None and labels is not None:
+        mask = [0] * k15_channels
+        for idx, label in enumerate(labels):
+            if label:
+                mask[idx] = 1
 
     if labels is None:
         labels = ["Ch{}".format(val + 1) for val in range(k15_channels)]

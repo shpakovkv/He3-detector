@@ -55,10 +55,12 @@ def get_time(raw_line):
     return hour, min, sec
 
 
-def get_time_stamp(raw_line):
+def get_time_stamp(raw_line, shift_seconds=0):
     day, month, year = get_date(raw_line)
     hour, min, sec = get_time(raw_line)
     date_and_time = datetime.datetime(year, month, day, hour, min, sec, tzinfo=None)
+    shift = datetime.timedelta(seconds=shift_seconds)
+    date_and_time += shift
     return date_and_time.timestamp()
 
 
@@ -69,14 +71,14 @@ def get_k15_line_tail(raw_line):
     return line_tail
 
 
-def get_k15_data(raw_lines):
+def get_k15_data(raw_lines, shift_seconds=0):
     rows = get_col_num(raw_lines[0])
     # -1 because date and time are separated
     rows -= 1
     points = len(raw_lines)
     data = np.ndarray(shape=(rows, points), dtype=np.int64)
     for point, raw_line in enumerate(raw_lines):
-        timestamp = get_time_stamp(raw_line)
+        timestamp = get_time_stamp(raw_line, shift_seconds=shift_seconds)
         data[0, point] = timestamp
         line_tail = get_k15_line_tail(raw_line)
         for row, val in enumerate(int(word) for word in line_tail.split()):
@@ -91,7 +93,7 @@ def get_slow_control_values(raw_line):
     return values
 
 
-def get_slow_control_data(raw_lines):
+def get_slow_control_data(raw_lines, shift_seconds=0):
     rows = 0
     for line in raw_lines:
         rows = get_col_num(line)
@@ -111,7 +113,7 @@ def get_slow_control_data(raw_lines):
     data = np.zeros(shape=(rows_to_store, points), dtype=np.int32)
 
     for point, raw_line in enumerate(raw_lines):
-        timestamp = get_time_stamp(raw_line)
+        timestamp = get_time_stamp(raw_line, shift_seconds)
         data[0, point] = timestamp
         values = get_slow_control_values(raw_line)
         data[1, point] = int(float(values[SC_VAL_POS["voltage"]]) * 1000)
