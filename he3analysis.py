@@ -239,7 +239,7 @@ def get_counting_rate(data, sec_per_record=DEFAULT_SEC_PER_RECORD):
         for row in range(1, data.shape[0]):
             rate = sum(data[row, :]) / records_num
             res.append(rate)
-            std_dev.append(stdev(data[row, :]))
+            std_dev.append(np.std(data[row, :]))
     else:
         # there are gaps in the records
         intervals = list()
@@ -252,7 +252,7 @@ def get_counting_rate(data, sec_per_record=DEFAULT_SEC_PER_RECORD):
         for row in range(1, data.shape[0]):
             rate = sum(data[row, :]) / records_num
             res.append(rate)
-            std_dev.append(stdev(data[row, :]))
+            std_dev.append(np.std(data[row, :]))
     return res, std_dev, there_are_gaps
 
 
