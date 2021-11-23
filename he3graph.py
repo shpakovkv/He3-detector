@@ -1,9 +1,5 @@
-import sys
 import os
-import numpy as np
-from k15reader import get_raw_lines, get_k15_data, get_slow_control_data
 from he3analysis import convert_time
-
 from matplotlib import pyplot as plt
 from matplotlib import dates as md
 import datetime

@@ -41,8 +41,9 @@ def file_processing(filename,
     if group_by_4:
         data = get_sum_by_number_of_channels(data, 4)
 
+    rates, err_rates, gaps = get_counting_rate(data)
     if verbose > 0:
-        print_k15_rates(data, group_by_4, verbose)
+        print_k15_rates(data, rates, err_rates, gaps, group_by_4, verbose)
 
     if group_by_sec > 0:
         data = get_average_by_time_interval(data, group_by_sec, include_tail=True, verbose=verbose)
@@ -97,9 +98,11 @@ def process_k15_and_sc(k15_file,
     # print(" until ")
     # print(datetime.datetime.fromtimestamp(int(data_sc[0, -1])).strftime('%H:%M:%S'))
 
+    rates_sc, err_rates_sc, gaps_sc = get_counting_rate(data_sc)
+    rates_k15, err_rates_k15, gaps_k15 = get_counting_rate(data_k15)
     if verbose > 0:
-        print_k15_rates(data_k15, group_by_4, verbose)
-        print_sc_average(data_sc, verbose)
+        print_k15_rates(data_k15, rates_k15, err_rates_k15, gaps_k15, group_by_4, verbose)
+        print_sc_average(data_sc, rates_sc, err_rates_sc, gaps_sc, verbose)
 
     data_sc_average = None
     if group_by_sec > 0:
@@ -114,15 +117,14 @@ def process_k15_and_sc(k15_file,
         make_k15_graph(data_k15, group_by_4, group_by_sec, base_out_name, save_graph, show_graph, verbose)
         if data_sc_average is None:
             # rates == list of avgs for all channels
-            rates, err_rates, gaps = get_counting_rate(data_sc)
             cols = data_sc.shape[0]
             data_sc_average = np.ndarray(shape=(cols, 2), dtype=data_sc.dtype)
             data_sc_average[0, 0] = data_sc[0, 0]
             data_sc_average[0, 1] = data_sc[0, -1]
             # ch is the index of channel (curve)
             for ch in range(cols - 1):
-                data_sc_average[ch + 1, 0] = rates[ch]
-                data_sc_average[ch + 1, 1] = rates[ch]
+                data_sc_average[ch + 1, 0] = rates_sc[ch]
+                data_sc_average[ch + 1, 1] = rates_sc[ch]
         make_k15_and_sc_graph(data_k15, data_sc, data_sc_average,
                               group_by_4=group_by_4,
                               base_out_name=base_out_name,
@@ -239,24 +241,6 @@ def make_timeline_graph_grouped_by_4(k15_files, sc_files, mask=0b101, show=True,
         raw_lines = get_raw_lines(sc_files[idx])
         data = get_slow_control_data(raw_lines)
         list_of_data_sc[idx] = data
-
-    # for idx, data_k15 in enumerate(list_of_data_k15):
-    #     fname = "{}{:03d}".format(save_as, idx)
-    #     make_k15_graph(data_k15,
-    #                    group_by_4=True,
-    #                    group_by_sec=0,
-    #                    base_out_name=fname + "_k15_",
-    #                    save_graph=save_as is not None,
-    #                    show_graph=show,
-    #                    verbose=2)
-    #     make_k15_and_sc_graph(data_k15,
-    #                           list_of_data_sc[0],
-    #                           data_sc_avg=None,
-    #                           group_by_4=True,
-    #                           base_out_name=fname + "_k15_and_sc_",
-    #                           save_graph=save_as is not None,
-    #                           show_graph=show,
-    #                           verbose=2)
 
     plt.close("all")
     fig, ax = plt.subplots(3, 1, sharex='all')

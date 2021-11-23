@@ -8,12 +8,10 @@ Author: Konstantin Shpakov, march 2021.
 import matplotlib.pyplot as plt
 import numpy as np
 from numba import njit, vectorize, float64
-from k15reader import get_raw_lines, get_k15_data, get_slow_control_data
 from file_handler import save_signals_csv
 import os
 import datetime
 from matplotlib import dates as md
-from statistics import stdev
 
 DEFAULT_SEC_PER_RECORD = 1.025
 ERR_COEF = 1.1
@@ -28,16 +26,15 @@ def convert_time(time, unixtime):
     return time
 
 
-def print_k15_rates(data, group_by_4, verbose):
-    rates, err_rates, gaps = get_counting_rate(data)
+def print_k15_rates(data, rates, err_rates, gaps, group_by_4, verbose):
     rates_str = ",  ".join("{:.4f}".format(val) for val in rates)
     err_rates_str = ", ".join("±{:.4f}".format(err) for err in err_rates)
     if group_by_4:
         print("Средний счет (сумма по 4) [1/с] = [{}]".format(rates_str))
-        print("Погрешность вычисления [1/с]    = [{}]".format(err_rates_str))
+        print("Ср. кв. отклонение              = [{}]".format(err_rates_str))
     else:
         print("Средний счет по каналам [1/с] = [{}]".format(rates_str))
-        print("Погрешность вычисления [1/с]  = [{}]".format(err_rates_str))
+        print("Ср. кв. отклонение            = [{}]".format(err_rates_str))
     # print(", Погрешность [1/с] = {}".format(err_rates))
 
     print("Длительность регистрации: {} сек. Количество записей: {}."
@@ -64,8 +61,7 @@ def print_k15_rates(data, group_by_4, verbose):
               "".format(real_time_per_record, err_real_time_per_records))
 
 
-def print_sc_average(data, verbose):
-    rates, err_rates, gaps = get_counting_rate(data)
+def print_sc_average(data, rates, err_rates, gaps, verbose=2):
 
     rates_str = ",  ".join("{:.4f}".format(val) for val in rates)
     err_rates_str = ", ".join("±{:.4f}".format(err) for err in err_rates)
