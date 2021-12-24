@@ -8,7 +8,6 @@ Author: Konstantin Shpakov, march 2021.
 import matplotlib.pyplot as plt
 import numpy as np
 from numba import njit, vectorize, float64
-
 from file_handler import save_signals_csv
 import os
 import datetime
@@ -234,7 +233,7 @@ def get_counting_rate(data, sec_per_record=DEFAULT_SEC_PER_RECORD):
     there_are_gaps = list()
     if real_sec_per_record <= sec_per_record * 1.1:
         for row in range(1, data.shape[0]):
-            rate = sum(data[row, :]) / records_num
+            rate = sum(data[row, :]) / float(records_num)
             res.append(rate)
             std_dev.append(np.std(data[row, :]))
     else:
@@ -247,7 +246,7 @@ def get_counting_rate(data, sec_per_record=DEFAULT_SEC_PER_RECORD):
                 there_are_gaps.append(data[0, idx] - data[0, idx - 1])
                 start = idx
         for row in range(1, data.shape[0]):
-            rate = sum(data[row, :]) / records_num
+            rate = sum(data[row, :]) / float(records_num)
             res.append(rate)
             std_dev.append(np.std(data[row, :]))
     return res, std_dev, there_are_gaps
@@ -263,22 +262,18 @@ def precompile():
     get_sc_ibounds(__temp1, __temp3)
 
 
-def get_128_ejections(data):
-    err_data = np.zeros(data.shape, dtype=data.dtype)
-    err_data[1:] = ll_get_128_ejections(data[1:])
-    err_data[1:] = err_data[1:] * 128
-    err_data[0, :] = np.copy(data[0, :])
-    return err_data
-
-
-@vectorize([float64(float64)])
-def ll_get_128_ejections(x):
-    return x // 128
-
-
 @vectorize([float64(float64)])
 def ll_filter_128(x):
     return x % 128
+
+
+@vectorize([float64(float64)])
+def ll_get_128_only(x):
+    return (x // 128) * 128
+
+
+def leave_128_only(data):
+    data[1:] = ll_get_128_only(data[1:])
 
 
 def filter_128(data):
