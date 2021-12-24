@@ -59,6 +59,7 @@ def graph_k15(data, mask=None, unixtime=True, labels=None, save_as=None, show_gr
 
 
 def graph_k15_and_sc(data_k15, data_sc, data_sc_avg=None, mask=None, unixtime=True, labels=None, save_as=None, show_graph=False, scatter=False):
+    subplot_title_size = 8
     plt.close('all')
     if data_k15.shape[1] == 1:
         scatter = True
@@ -82,11 +83,15 @@ def graph_k15_and_sc(data_k15, data_sc, data_sc_avg=None, mask=None, unixtime=Tr
     ax[0].plot(convert_time(data_sc[0], unixtime=unixtime), data_sc[1], '-')
     if data_sc_avg is not None:
         ax[0].plot(convert_time(data_sc_avg[0], unixtime=unixtime), data_sc_avg[1], 's-')
+        avg_text = "Average {:.1f} V".format(data_sc_avg[1, 0])
+        ax[0].set_title(avg_text, size=subplot_title_size)
     plt.setp(ax[0], ylabel='Voltage, V')
 
     ax[1].plot(convert_time(data_sc[0], unixtime=unixtime), data_sc[2], '-')
     if data_sc_avg is not None:
         ax[1].plot(convert_time(data_sc_avg[0], unixtime=unixtime), data_sc_avg[2], 's-')
+        avg_text = "Average {:.4f} mkA".format(data_sc_avg[2, 0])
+        ax[1].set_title(avg_text, size=subplot_title_size)
     plt.setp(ax[1], ylabel='Current, mkA')
 
     seconds = convert_time(data_k15[0], unixtime=unixtime)
@@ -113,7 +118,7 @@ def graph_k15_and_sc(data_k15, data_sc, data_sc_avg=None, mask=None, unixtime=Tr
     plt.xlabel("Time")
     plt.ylabel("Counts")
     channels_list = [idx for idx in range(k15_channels) if mask[idx]]
-    ax[0].title.set_text('He³ detectors')
+    fig.suptitle('He³ detectors', fontsize=14)
     # plt.title("He³ detectors")
 
     ax[2].legend()
