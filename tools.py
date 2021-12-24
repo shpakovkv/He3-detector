@@ -11,6 +11,7 @@ from he3analysis import print_k15_rates
 from he3analysis import print_sc_average
 from he3analysis import get_sc_ibounds
 from he3analysis import get_counting_rate
+from he3analysis import get_128_ejections
 
 import os
 import numpy as np
@@ -212,74 +213,30 @@ def make_k15_and_sc_graph(data_k15, data_sc, data_sc_avg=None, group_by_4=False,
         plt.show()
 
 
-def make_timeline_graph_grouped_by_4(k15_files, sc_files, mask=0b101, show=True, save_as=None, shift_k15_seconds=0):
-    if not isinstance(k15_files, list):
-        assert isinstance(k15_files, str), \
-            "Wrong input type. Expected list os string or string, got " \
-            "{} instead.".format(type(k15_files))
-        k15_files = [k15_files]
-    if not isinstance(sc_files, list):
-        assert isinstance(sc_files, str), \
-            "Wrong input type. Expected list os string or string, got " \
-            "{} instead.".format(type(sc_files))
-        sc_files = [sc_files]
-    for fname in k15_files:
-        assert os.path.isfile(fname), "File {} not found.".format(fname)
-    for fname in sc_files:
-        assert os.path.isfile(fname), "File {} not found.".format(fname)
-
-    list_of_data_k15 = [None] * len(k15_files)
-    list_of_data_sc = [None] * len(sc_files)
-
-    for idx in range(len(list_of_data_k15)):
-        raw_lines = get_raw_lines(k15_files[idx])
-        data = get_k15_data(raw_lines, shift_k15_seconds)
-        data = get_sum_by_number_of_channels(data, 4)
-        list_of_data_k15[idx] = data
-
-    for idx in range(len(list_of_data_sc)):
-        raw_lines = get_raw_lines(sc_files[idx])
-        data = get_slow_control_data(raw_lines)
-        list_of_data_sc[idx] = data
-
+def graph_timeline(data_all_k15, data_sc, mask, save_as, show, title):
     plt.close("all")
     fig, ax = plt.subplots(3, 1, sharex='all')
 
+    if title is not None:
+        fig.suptitle(title)
+
     plt.setp(ax[0], ylabel='Voltage, V')
     plt.setp(ax[1], ylabel='Current, mkA')
-
-    sc_cols = list_of_data_sc[0].shape[0]
-    sc_shape = (sc_cols, 1)
-    single_nan_sc = np.zeros(shape=sc_shape, dtype=np.float64)
-    single_nan_sc[0, 0] = 0.0
-    for idx in range(1, single_nan_sc.shape[0]):
-        single_nan_sc[idx, 0] = np.nan
-    data_all_sc = list_of_data_sc[0].astype(np.float64)
-
-    for data_sc in list_of_data_sc[1:]:
-        data_all_sc = np.concatenate((data_all_sc, single_nan_sc, data_sc), axis=1)
-
-    ax[0].plot(convert_time(data_all_sc[0], unixtime=True), data_all_sc[1], '-', label="Voltage", color="deepskyblue")
-    ax[1].plot(convert_time(data_all_sc[0], unixtime=True), data_all_sc[2], '-', label="Current", color="darkorange")
-
-    k15_cols = list_of_data_k15[0].shape[0]
-    k15_shape = (k15_cols, 1)
-    single_nan_k15 = np.empty(shape=k15_shape, dtype=np.float64)
-    single_nan_k15[0, 0] = 0.0
-    for idx in range(1, single_nan_k15.shape[0]):
-        single_nan_k15[idx, 0] = np.nan
-    data_all_k15 = list_of_data_k15[0].astype(np.float64)
-
     plt.setp(ax[2], ylabel='Counts')
-    for data_k15 in list_of_data_k15[1:]:
-        data_all_k15 = np.concatenate((data_all_k15, single_nan_k15, data_k15), axis=1)
+
+    dates_sc = [datetime.datetime.fromtimestamp(ts) for ts in data_sc[0]]
+
+    ax[0].plot(dates_sc, data_sc[1], '-', label="Voltage", color="deepskyblue")
+    ax[1].plot(dates_sc, data_sc[2], '-', label="Current", color="darkorange")
+
+    dates_k15 = [datetime.datetime.fromtimestamp(ts) for ts in data_all_k15[0]]
 
     if mask & 0b001:
-        ax[2].plot(convert_time(data_all_k15[0], unixtime=True), data_all_k15[1], '-', label="Ch1-4", color="red")
+        ax[2].plot(dates_k15, data_all_k15[1], '-', label="Ch1-4", color="red")
     if mask & 0b010:
-        ax[2].plot(convert_time(data_all_k15[0], unixtime=True), data_all_k15[2], '-', label="Ch5-8", color="lime")
+        ax[2].plot(dates_k15, data_all_k15[2], '-', label="Ch5-8", color="lime")
     if mask & 0b100:
-        ax[2].plot(convert_time(data_all_k15[0], unixtime=True), data_all_k15[3], '-', label="Ch9-12", color="blue")
+        ax[2].plot(dates_k15, data_all_k15[3], '-', label="Ch9-12", color="blue")
 
     # Choose your xtick format string
     # date_fmt = '%d-%m-%y %H:%M:%S'
@@ -304,6 +261,69 @@ def make_timeline_graph_grouped_by_4(k15_files, sc_files, mask=0b101, show=True,
 
     if show:
         plt.show()
+
+
+def make_timeline_graph_grouped_by_4(k15_files, sc_files, mask=0b101, show=True, save_as=None, shift_k15_seconds=0):
+    if not isinstance(k15_files, list):
+        assert isinstance(k15_files, str), \
+            "Wrong input type. Expected list os string or string, got " \
+            "{} instead.".format(type(k15_files))
+        k15_files = [k15_files]
+    if not isinstance(sc_files, list):
+        assert isinstance(sc_files, str), \
+            "Wrong input type. Expected list os string or string, got " \
+            "{} instead.".format(type(sc_files))
+        sc_files = [sc_files]
+    for fname in k15_files:
+        assert os.path.isfile(fname), "File {} not found.".format(fname)
+    for fname in sc_files:
+        assert os.path.isfile(fname), "File {} not found.".format(fname)
+
+    list_of_data_k15 = [None] * len(k15_files)
+    list_of_128_ejection_k15 = [None] * len(k15_files)
+    list_of_data_sc = [None] * len(sc_files)
+
+    for idx in range(len(list_of_data_k15)):
+        raw_lines = get_raw_lines(k15_files[idx])
+        data = get_k15_data(raw_lines, shift_k15_seconds)
+        data = get_sum_by_number_of_channels(data, 4)
+        list_of_128_ejection_k15[idx] = get_128_ejections(data)
+        filter_128(data)
+        list_of_data_k15[idx] = data
+
+    for idx in range(len(list_of_data_sc)):
+        raw_lines = get_raw_lines(sc_files[idx])
+        data = get_slow_control_data(raw_lines)
+        list_of_data_sc[idx] = data
+
+    sc_cols = list_of_data_sc[0].shape[0]
+    sc_shape = (sc_cols, 1)
+    single_nan_sc = np.zeros(shape=sc_shape, dtype=np.float64)
+    single_nan_sc[0, 0] = 0.0
+    for idx in range(1, single_nan_sc.shape[0]):
+        single_nan_sc[idx, 0] = np.nan
+    data_all_sc = list_of_data_sc[0].astype(np.float64)
+
+    for data_sc in list_of_data_sc[1:]:
+        data_all_sc = np.concatenate((data_all_sc, single_nan_sc, data_sc), axis=1)
+
+    k15_cols = list_of_data_k15[0].shape[0]
+    k15_shape = (k15_cols, 1)
+    single_nan_k15 = np.empty(shape=k15_shape, dtype=np.float64)
+    single_nan_k15[0, 0] = 0.0
+    for idx in range(1, single_nan_k15.shape[0]):
+        single_nan_k15[idx, 0] = np.nan
+    data_all_k15 = list_of_data_k15[0].astype(np.float64)
+    err_128_data_all_k15 = list_of_128_ejection_k15[0].astype(np.float64)
+
+    for data_k15 in list_of_data_k15[1:]:
+        data_all_k15 = np.concatenate((data_all_k15, single_nan_k15, data_k15), axis=1)
+
+    for err_128_data in list_of_128_ejection_k15[1:]:
+        err_128_data_all_k15 = np.concatenate((err_128_data_all_k15, single_nan_k15, err_128_data), axis=1)
+
+    graph_timeline(data_all_k15, data_all_sc, mask, save_as, show, title="Experiment timeline")
+    graph_timeline(err_128_data_all_k15, data_all_sc, mask, save_as + "_128", show, title="128 ejections only")
 
 
 def time_step_graph(filename, datatype, show=True, save=False):

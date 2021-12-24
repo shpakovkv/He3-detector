@@ -8,6 +8,7 @@ Author: Konstantin Shpakov, march 2021.
 import matplotlib.pyplot as plt
 import numpy as np
 from numba import njit, vectorize, float64
+
 from file_handler import save_signals_csv
 import os
 import datetime
@@ -260,6 +261,19 @@ def precompile():
     __temp3 = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], dtype=np.int64)
     __temp3 = __temp1.reshape(2, 6)
     get_sc_ibounds(__temp1, __temp3)
+
+
+def get_128_ejections(data):
+    err_data = np.zeros(data.shape, dtype=data.dtype)
+    err_data[1:] = ll_get_128_ejections(data[1:])
+    err_data[1:] = err_data[1:] * 128
+    err_data[0, :] = np.copy(data[0, :])
+    return err_data
+
+
+@vectorize([float64(float64)])
+def ll_get_128_ejections(x):
+    return x // 128
 
 
 @vectorize([float64(float64)])
