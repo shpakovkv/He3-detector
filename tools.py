@@ -44,6 +44,7 @@ def file_processing(filename,
 
     rates, err_rates, gaps = get_counting_rate(data)
     if verbose > 0:
+        print_time_bounds(data[0, 0], data[0, -1])
         print_k15_rates(data, rates, err_rates, gaps, group_by_4, verbose)
 
     if group_by_sec > 0:
