@@ -18,6 +18,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import dates as md
 import datetime
+from pathlib import Path
 
 
 def file_processing(filename,
@@ -178,8 +179,11 @@ def print_files_from_interval(fname_list, file_borders_list, start, stop):
 
 def make_k15_graph(data, group_by_4, group_by_sec, base_out_name, save_graph, show_graph, verbose):
     save_graph_as = None
+    base_dir = os.path.dirname(base_out_name)
+    parent_dir = os.path.dirname(base_dir)
+    base_name = os.path.basename(base_out_name)
     if save_graph:
-        save_graph_as = base_out_name
+        save_graph_as = os.path.join(parent_dir, "Graph", base_name)
     scatter_graph = False
     if group_by_sec:
         scatter_graph = True
@@ -204,7 +208,7 @@ def make_k15_graph(data, group_by_4, group_by_sec, base_out_name, save_graph, sh
                   save_as=save_as,
                   scatter=scatter_graph,
                   show_graph=show_graph)
-    if verbose > 1 and save_graph_as is not None:
+    if verbose > 2 and save_graph_as is not None:
         if group_by_4:
             print("График сохранен: {}".format(os.path.basename(save_graph_as)))
         else:
@@ -216,9 +220,12 @@ def make_k15_graph(data, group_by_4, group_by_sec, base_out_name, save_graph, sh
 
 def make_k15_and_sc_graph(data_k15, data_sc, data_sc_avg=None, group_by_4=False, base_out_name="", save_graph=False, show_graph=False, verbose=0):
     save_graph_as = None
+    base_dir = os.path.dirname(base_out_name)
+    parent_dir = os.path.dirname(base_dir)
+    base_name = os.path.basename(base_out_name)
     if save_graph:
-        save_graph_as = os.path.dirname(base_out_name)
-        save_graph_as = os.path.join(save_graph_as, "SlowControl_" + os.path.basename(base_out_name))
+        save_graph_as = os.path.join(parent_dir, "Graph", "SlowControl_" + base_name)
+
     if group_by_4:
         if save_graph:
             save_graph_as += ".png"
@@ -433,10 +440,15 @@ def time_step_graph(filename, datatype, show=True, save=False):
     plt.plot(res, '-', color="blue")
     if save:
         save_as = os.path.dirname(filename)
+        save_dir = Path(save_as)
+        save_dir = save_dir.parent
+        save_dir = save_dir.joinpath("Time_Step_Graph")
+        if not save_dir.is_dir():
+            os.makedirs(save_dir)
         if datatype == "k15":
-            save_as = os.path.join(save_as, "Time_Step_" + os.path.basename(filename) + ".png")
+            save_as = os.path.join(save_dir, "Time_Step_" + os.path.basename(filename) + ".png")
         elif datatype == "sc":
-            save_as = os.path.join(save_as, "Time_Step_SlowControl_" + os.path.basename(filename) + ".png")
+            save_as = os.path.join(save_dir, "Time_Step_SlowControl_" + os.path.basename(filename) + ".png")
         plt.savefig(save_as, dpi=300)
     if show:
         plt.show()

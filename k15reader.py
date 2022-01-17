@@ -12,12 +12,29 @@ Author: Konstantin Shpakov, march 2021.
 """
 
 import re
+import os
 import numpy as np
 import datetime
 
 
 SLOW_CONTROL_DATA_COLUMNS = 11
 SC_VAL_POS = {"voltage": 0, "current": 2}
+
+
+def get_file_list(path, sort=True):
+    """Returns a list of all files
+    contained in the folder (path).
+    Each element of the returned list is a full path to the file
+
+    path -- target directory.
+    sort -- by default, the list of results is sorted
+            by creation time.
+    """
+    target_files = [os.path.join(path, x) for x in os.listdir(path)
+                    if os.path.isfile(os.path.join(path, x))]
+    if sort:
+        target_files.sort(key=lambda x: os.path.getctime(x))
+    return target_files
 
 
 def get_raw_lines(filename):

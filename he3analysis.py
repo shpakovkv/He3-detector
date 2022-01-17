@@ -231,24 +231,18 @@ def get_counting_rate(data, sec_per_record=DEFAULT_SEC_PER_RECORD):
     records_num += 1
 
     there_are_gaps = list()
-    if real_sec_per_record <= sec_per_record * 1.1:
-        for row in range(1, data.shape[0]):
-            rate = sum(data[row, :]) / float(records_num)
-            res.append(rate)
-            std_dev.append(np.std(data[row, :]))
-    else:
-        # there are gaps in the records
-        intervals = list()
-        start = 0
-        for idx in range(1, records_num):
-            if data[0, idx] - data[0, idx - 1] > sec_per_record + MIN_TIME_STEP:
-                intervals.append([start, idx - 1])
-                there_are_gaps.append(data[0, idx] - data[0, idx - 1])
-                start = idx
-        for row in range(1, data.shape[0]):
-            rate = sum(data[row, :]) / float(records_num)
-            res.append(rate)
-            std_dev.append(np.std(data[row, :]))
+
+    intervals = list()
+    start = 0
+    for idx in range(1, records_num):
+        if data[0, idx] - data[0, idx - 1] > sec_per_record + MIN_TIME_STEP:
+            intervals.append([start, idx - 1])
+            there_are_gaps.append(data[0, idx] - data[0, idx - 1])
+            start = idx
+    for row in range(1, data.shape[0]):
+        rate = sum(data[row, :]) / float(records_num)
+        res.append(rate)
+        std_dev.append(np.std(data[row, :]))
     return res, std_dev, there_are_gaps
 
 
