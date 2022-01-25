@@ -310,9 +310,23 @@ def space_padded_num(num, digits):
 def get_sc_ibounds(k15_data, sc_data):
     start_k15_time = k15_data[0, 0]
     stop_k15_time = k15_data[0, -1]
-    assert start_k15_time < sc_data[0, -1], "Error! SlowControl data is written later than K15 data."
+    
+    # print("K15 Started at ({}) and finished at ({})"
+    #       "".format(datetime.datetime.fromtimestamp(start_k15_time).strftime("%d.%m.%Y %H:%M:%S"),
+    #                 datetime.datetime.fromtimestamp(stop_k15_time).strftime("%d.%m.%Y %H:%M:%S")))
+    # print("SlowControl Started at ({}) and finished at ({})"
+    #       "".format(datetime.datetime.fromtimestamp(sc_data[0, 0]).strftime("%d.%m.%Y %H:%M:%S"),
+    #                 datetime.datetime.fromtimestamp(sc_data[0, -1]).strftime("%d.%m.%Y %H:%M:%S")))
+    assert start_k15_time < sc_data[0, -1], \
+        "Error! SlowControl data registration finished earlier ({}) " \
+        "than K15 data registration started ({})." \
+        "".format(datetime.datetime.fromtimestamp(sc_data[0, -1]).strftime("%d.%m.%Y %H:%M:%S"),
+                  datetime.datetime.fromtimestamp(start_k15_time).strftime("%d.%m.%Y %H:%M:%S"))
     assert stop_k15_time > sc_data[0, 0], \
-        "Error! SlowControl data registration finished earlier than K15 data registration started."
+        "Error! K15 data registration finished earlier ({}) " \
+        "than SlowControl data registration started ({})." \
+        "".format(datetime.datetime.fromtimestamp(stop_k15_time).strftime("%d.%m.%Y %H:%M:%S"),
+                  datetime.datetime.fromtimestamp(sc_data[0, 0]).strftime("%d.%m.%Y %H:%M:%S"))
     start_sc_idx = None
     stop_sc_idx = None
     for idx in range(sc_data.shape[1]):

@@ -96,6 +96,9 @@ def process_k15_and_sc(k15_file,
     if group_by_4:
         data_k15 = get_sum_by_number_of_channels(data_k15, 4)
 
+    # print("K15 File ({})".format(k15_file))
+    # print("SlowControl files: ", end="")
+    # print("\n".join(sc_file_list))
     start_sc_idx, stop_sc_idx = get_sc_ibounds(data_k15, data_sc)
     # DEBUG !!!!!!!!!!!!!!!!!!!!!!!!!!
     # start_sc_idx, stop_sc_idx = 4640, 5911
