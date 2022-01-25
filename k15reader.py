@@ -21,7 +21,7 @@ SLOW_CONTROL_DATA_COLUMNS = 11
 SC_VAL_POS = {"voltage": 0, "current": 2}
 
 
-def get_file_list(path, sort=True):
+def get_file_list(path, sort_by_name=False, sort_by_ctime=False):
     """Returns a list of all files
     contained in the folder (path).
     Each element of the returned list is a full path to the file
@@ -32,7 +32,9 @@ def get_file_list(path, sort=True):
     """
     target_files = [os.path.join(path, x) for x in os.listdir(path)
                     if os.path.isfile(os.path.join(path, x))]
-    if sort:
+    if sort_by_name:
+        target_files.sort()
+    if sort_by_ctime:
         target_files.sort(key=lambda x: os.path.getctime(x))
     return target_files
 
