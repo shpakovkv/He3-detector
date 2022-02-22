@@ -20,6 +20,81 @@ ERR_COEF = 1.1
 MIN_TIME_STEP = 1
 
 
+def get_extreme_deviation_intervals(time, value):
+    """
+    Checks curve data for extreme deviation from mean (signal drop or spurts).
+    The input data should be 1-dimensional array (time column and value column).
+
+    Extreme deviation is: TODO: deviation metric
+
+    Returns all deviation intervals as pair (list) of time values [start, stop].
+    All time pairs are combined into list.
+
+    If there are no extreme deviation, returns None.
+
+    Return example: [[0.0, 1.0], [3.0, 10.0]]
+
+    :param time: 1-dimensional array with time data
+    :param value: 1-dimensional array with value data
+    :type time: np.ndarray
+    :type value: np.ndarray
+    :return: all deviation intervals (list of lists) or None
+    :rtype: list
+    """
+    res = None
+    first_diff = np.diff(value, n=1)
+    data_mean = value.mean()
+    fig, axes = plt.subplots(2, 1, sharex='all', squeeze=False)
+    axes[0, 0].plot(time, value)
+    axes[0, 0].plot([time[0], time[-1]], [data_mean, data_mean], 'r-')
+    axes[1, 0].plot(time[:-1], first_diff)
+
+    from scipy.signal import savgol_filter
+    smooth = savgol_filter(value, 501, 2)
+    print("Value shape = {},  Smooth shape = {}".format(value.shape, smooth.shape))
+    axes[0, 0].plot(time, smooth, 'm-')
+
+    print("Diff mean = {}".format(first_diff.mean()))
+    print("Diff std err = {}".format(first_diff.std()))
+    plt.show()
+    return res
+
+
+def cut_out_interval(arr, interval, with_gaps=False):
+    """
+    Cuts out data from input array.
+    Interval is the start-stop time pair.
+    If with_gaps flag is True, then one NaN value will be added
+    between the remaining two pieces of data
+
+    Returns new data array.
+
+    :param arr: 2-dimensional array with data
+    :param interval: list or array with two time points
+
+    :type arr: np.ndarray
+    :type interval: list or tuple or np.ndarray
+
+    :return: new modified data array
+    :rtype: np.ndarray
+    """
+    supported_arr_types = "np.ndarray"
+    supported_interval_types = "list or tuple or np.ndarray"
+    assert isinstance(arr, np.ndarray), \
+        "Arr value is of an unsupported type. " \
+        "Expected {}, got {} instead.".format(supported_arr_types, type(arr))
+    assert isinstance(interval, list) or \
+           isinstance(interval, tuple) or \
+           isinstance(interval, np.ndarray), \
+           "Interval value is of an unsupported type. " \
+           "Expected {}, got {} instead." \
+           "".format(supported_interval_types, type(interval))
+    assert len(interval) == 2, \
+        "Unsupported interval length. " \
+        "Expected 2, got {} instead.".format(len(interval))
+
+
+
 def convert_time(time, unixtime):
     if unixtime:
         return md.epoch2num(time)
