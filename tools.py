@@ -12,6 +12,7 @@ from he3analysis import print_k15_rates
 from he3analysis import print_sc_average
 from he3analysis import get_sc_ibounds
 from he3analysis import get_counting_rate
+from he3analysis import cut_out_all_intervals
 
 import os
 import numpy as np
@@ -29,7 +30,8 @@ def file_processing(filename,
                     make_graph=False,
                     save_graph=False,
                     show_graph=False,
-                    verbose=1):
+                    verbose=1,
+                    cut_intervals=None):
     if verbose > 0:
         print()
         print("Файл \"{}\"".format(os.path.basename(filename)))
@@ -42,6 +44,9 @@ def file_processing(filename,
 
     if group_by_4:
         data = get_sum_by_number_of_channels(data, 4)
+
+    if cut_intervals:
+        data = cut_out_all_intervals(data, cut_intervals)
 
     rates, err_rates, gaps = get_counting_rate(data)
     if verbose > 0:
@@ -73,7 +78,8 @@ def process_k15_and_sc(k15_file,
                        save_graph=False,
                        show_graph=False,
                        verbose=1,
-                       shift_k15_seconds=0
+                       shift_k15_seconds=0,
+                       cut_intervals=None
                        ):
     if not isinstance(sc_file_list, list):
         sc_file_list = [sc_file_list]
@@ -108,6 +114,10 @@ def process_k15_and_sc(k15_file,
     # print(datetime.datetime.fromtimestamp(int(data_sc[0, 0])).strftime('%H:%M:%S'), end="")
     # print(" until ")
     # print(datetime.datetime.fromtimestamp(int(data_sc[0, -1])).strftime('%H:%M:%S'))
+
+    if cut_intervals:
+        data_k15 = cut_out_all_intervals(data_k15, cut_intervals)
+        data_sc = cut_out_all_intervals(data_sc, cut_intervals)
 
     rates_sc, err_rates_sc, gaps_sc = get_counting_rate(data_sc)
     rates_k15, err_rates_k15, gaps_k15 = get_counting_rate(data_k15)

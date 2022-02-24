@@ -12,6 +12,8 @@ from file_handler import save_signals_csv
 import os
 import datetime
 from matplotlib import dates as md
+from k15reader import get_time, get_date
+from datetime import datetime
 
 DEFAULT_SEC_PER_RECORD = 1.025
 ERR_COEF = 1.1
@@ -60,29 +62,99 @@ def get_extreme_deviation_intervals(time, value):
     return res
 
 
-def cut_out_interval(arr, interval, with_gaps=False):
+def cut_out_all_intervals(data, list_of_intervals, with_gaps=False):
+    """
+        Cuts out data from input array.
+
+        Intervals is the list of some start-stop time pairs.
+
+        If with_gaps flag is True, all cut data sections will be replaced by one NaN value.
+
+        Returns modified data array.
+
+        :param data: 2-dimensional array with data
+        :param list_of_intervals: list or array with two time points
+        :type data: np.ndarray
+        :type list_of_intervals: list or tuple or np.ndarray
+
+        :return: modified data array
+        :rtype: np.ndarray
+        """
+    supported_arr_types = "np.ndarray"
+    supported_interval_types = "list or tuple or np.ndarray"
+    assert isinstance(data, np.ndarray), \
+        "Arr value is of an unsupported type. " \
+        "Expected {}, got {} instead.".format(supported_arr_types, type(data))
+    assert data.ndim == 2, \
+        "Data must be 2-dimensional array. Got {} ndims instead.".format(data.ndim)
+    assert isinstance(list_of_intervals, list) or \
+           isinstance(list_of_intervals, tuple) or \
+           isinstance(list_of_intervals, np.ndarray), \
+           "Interval value is of an unsupported type. " \
+           "Expected {}, got {} instead." \
+           "".format(supported_interval_types, type(list_of_intervals))
+    assert len(list_of_intervals) > 0, \
+        "Unsupported interval length. " \
+        "Expected >= 1, got {} instead.".format(len(list_of_intervals))
+
+    # if nothing to cut, return
+    if not list_of_intervals:
+        return data
+
+    # TODO: verbose cutting (output of real boundaries of cut out intervals)
+    list_of_intervals = convert_intervals_to_timestamp(list_of_intervals, data)
+
+    for time_pair in list_of_intervals:
+        data = cut_out_interval(data, time_pair, with_gaps=with_gaps)
+    return data
+
+
+def convert_intervals_to_timestamp(list_of_intervals, data):
+    for idx, time_pair in enumerate(list_of_intervals):
+        if isinstance(time_pair[0], float) and isinstance(time_pair[1], float):
+            continue
+
+        assert isinstance(time_pair[0], str) and isinstance(time_pair[1], str), \
+            "Wrong time value type ({}). " \
+            "Expected [str, str], got [{}, {}] instead" \
+            "".format(time_pair, type(time_pair[0]), type(time_pair[0]))
+        for j, time in enumerate(time_pair):
+            day, month, year = None, None, None
+            try:
+                day, month, year = get_date(time)
+            except AssertionError:
+                base = datetime.fromtimestamp(data[0, 0])
+                day, month, year = base.day, base.month, base.year
+            hour, min, sec = get_time(time)
+            date_and_time = datetime(year, month, day, hour, min, sec, tzinfo=None)
+            list_of_intervals[idx][j] = date_and_time.timestamp()
+    return list_of_intervals
+
+
+def cut_out_interval(data, interval, with_gaps=False):
     """
     Cuts out data from input array.
     Interval is the start-stop time pair.
     If with_gaps flag is True, then one NaN value will be added
-    between the remaining two pieces of data
+    between the remaining two pieces of data.
 
-    Returns new data array.
+    Returns modified data array.
 
-    :param arr: 2-dimensional array with data
+    :param data: 2-dimensional array with data
     :param interval: list or array with two time points
-
-    :type arr: np.ndarray
+    :type data: np.ndarray
     :type interval: list or tuple or np.ndarray
 
-    :return: new modified data array
+    :return: modified data array
     :rtype: np.ndarray
     """
     supported_arr_types = "np.ndarray"
     supported_interval_types = "list or tuple or np.ndarray"
-    assert isinstance(arr, np.ndarray), \
+    assert isinstance(data, np.ndarray), \
         "Arr value is of an unsupported type. " \
-        "Expected {}, got {} instead.".format(supported_arr_types, type(arr))
+        "Expected {}, got {} instead.".format(supported_arr_types, type(data))
+    assert data.ndim == 2, \
+        "Data must be 2-dimensional array. Got {} ndims instead.".format(data.ndim)
     assert isinstance(interval, list) or \
            isinstance(interval, tuple) or \
            isinstance(interval, np.ndarray), \
@@ -92,7 +164,62 @@ def cut_out_interval(arr, interval, with_gaps=False):
     assert len(interval) == 2, \
         "Unsupported interval length. " \
         "Expected 2, got {} instead.".format(len(interval))
+    assert interval[0] <= interval[1], \
+        "Left interval border ({}) is greater than the right ({})." \
+        "".format(interval[0], interval[1])
 
+    idx_start, idx_stop = _get_interval_idx(data, interval)
+
+    if idx_start is None or idx_stop is None:
+        return data
+
+    # 1-dimensional mask
+    mask = np.ones(shape=data.shape[1], dtype=bool)
+
+    # right border value is included
+    mask[idx_start:idx_stop + 1] = False
+
+    # add nan if cutting inner interval
+    if with_gaps and idx_start > 0 and idx_stop < data.shape[1] - 1:
+        # leave one element and replace it with nan
+        mask[idx_stop] = True
+        data[:, idx_stop] = np.nan
+        # masking (cutting out) all columns
+        data = data[:, mask]
+    else:
+        # masking (cutting out) all columns
+        data = data[:, mask]
+    return data
+
+
+def _get_interval_idx(data, interval):
+    """
+        Convert time interval to index interval.
+        Np input data checks!
+
+        Returns start idx and stop idx.
+
+        Where start idx is the idx of time column (data[0]) element >= start time,
+        and stop idx is the idx of time column (data[0]) element <= stop time.
+
+        :param data: 2-dimensional array with data
+        :param interval: list or array with start-stop time pair
+        :type data: np.ndarray
+        :type interval: list or tuple or np.ndarray
+
+        :return: None or a tuple with interval start idx and stop idx (both included)
+        :rtype: tuple or None
+        """
+    if interval[0] > data[0, -1] or interval[1] < data[0, 0]:
+        return None, None
+
+    # search interval[0] <= time[start]
+    start = np.searchsorted(data[0], interval[0], side='left')
+
+    # search time[stop - 1] <= interval[1]
+    stop = np.searchsorted(data[0], interval[1], side='right')
+    stop -= 1
+    return start, stop
 
 
 def convert_time(time, unixtime):
