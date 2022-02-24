@@ -321,6 +321,10 @@ def make_timeline_graph_grouped_by_4(k15_files, sc_files, mask=0b101, show=True,
 
     ylabels = ['Voltage, V', 'Current, mkA', '128_overflows']
     title = "128 ejections only"
+
+    if "." in save_as[-5:]:
+        while "." in save_as[-5:]:
+            save_as = save_as[:-1]
     save_as_128 = save_as + "_128_only"
 
     graph_timeline(data_all_128_from_k15,
