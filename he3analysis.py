@@ -62,7 +62,7 @@ def get_extreme_deviation_intervals(time, value):
     return res
 
 
-def cut_out_all_intervals(data, list_of_intervals, with_gaps=False):
+def cut_out_all_intervals(data, list_of_intervals, with_gaps=False, verbose=0):
     """
         Cuts out data from input array.
 
@@ -74,8 +74,10 @@ def cut_out_all_intervals(data, list_of_intervals, with_gaps=False):
 
         :param data: 2-dimensional array with data
         :param list_of_intervals: list or array with two time points
+        :param verbose: if > 0, than print date-time of first and last points of deleted intervals
         :type data: np.ndarray
         :type list_of_intervals: list or tuple or np.ndarray
+        :type verbose: int
 
         :return: modified data array
         :rtype: np.ndarray
@@ -102,14 +104,28 @@ def cut_out_all_intervals(data, list_of_intervals, with_gaps=False):
         return data
 
     # TODO: verbose cutting (output of real boundaries of cut out intervals)
+
     list_of_intervals = convert_intervals_to_timestamp(list_of_intervals, data)
 
+    at_least_one_cut = 0
     for time_pair in list_of_intervals:
-        data = cut_out_interval(data, time_pair, with_gaps=with_gaps)
+        data, start_str, stop_str = cut_out_interval(data, time_pair, with_gaps=with_gaps)
+
+        if at_least_one_cut < 1 and start_str is not None:
+            at_least_one_cut = 1
+        if verbose > 0:
+            if at_least_one_cut == 1:
+                print("Удалены интервалы: ", end="")
+                at_least_one_cut = 2
+            if start_str is not None:
+                print("[{} - {}]".format(start_str, stop_str), end=" ")
+    if verbose > 0 and at_least_one_cut > 0:
+        print()
     return data
 
 
 def convert_intervals_to_timestamp(list_of_intervals, data):
+    list_of_intervals_ts = []
     for idx, time_pair in enumerate(list_of_intervals):
         if isinstance(time_pair[0], float) and isinstance(time_pair[1], float):
             continue
@@ -118,6 +134,8 @@ def convert_intervals_to_timestamp(list_of_intervals, data):
             "Wrong time value type ({}). " \
             "Expected [str, str], got [{}, {}] instead" \
             "".format(time_pair, type(time_pair[0]), type(time_pair[0]))
+
+        interval_ts = []
         for j, time in enumerate(time_pair):
             day, month, year = None, None, None
             try:
@@ -127,7 +145,11 @@ def convert_intervals_to_timestamp(list_of_intervals, data):
                 day, month, year = base.day, base.month, base.year
             hour, min, sec = get_time(time)
             date_and_time = datetime(year, month, day, hour, min, sec, tzinfo=None)
-            list_of_intervals[idx][j] = date_and_time.timestamp()
+            interval_ts.append(date_and_time.timestamp())
+        assert interval_ts[1] > interval_ts[0], \
+            "Left interval border ({}) is greater than the right ({}).".format(list_of_intervals[idx][0], list_of_intervals[idx][1])
+        list_of_intervals[idx][0] = interval_ts[0]
+        list_of_intervals[idx][1] = interval_ts[1]
     return list_of_intervals
 
 
@@ -145,8 +167,8 @@ def cut_out_interval(data, interval, with_gaps=False):
     :type data: np.ndarray
     :type interval: list or tuple or np.ndarray
 
-    :return: modified data array
-    :rtype: np.ndarray
+    :return: modified data array, start and stop point of deleted interval
+    :rtype: tuple
     """
     supported_arr_types = "np.ndarray"
     supported_interval_types = "list or tuple or np.ndarray"
@@ -171,13 +193,16 @@ def cut_out_interval(data, interval, with_gaps=False):
     idx_start, idx_stop = _get_interval_idx(data, interval)
 
     if idx_start is None or idx_stop is None:
-        return data
+        return data, None, None
 
     # 1-dimensional mask
     mask = np.ones(shape=data.shape[1], dtype=bool)
 
     # right border value is included
     mask[idx_start:idx_stop + 1] = False
+
+    start_str = datetime.fromtimestamp(data[0, idx_start]).strftime("%Y.%m.%d %H:%M:%S")
+    stop_str = datetime.fromtimestamp(data[0, idx_stop]).strftime("%Y.%m.%d %H:%M:%S")
 
     # add nan if cutting inner interval
     if with_gaps and idx_start > 0 and idx_stop < data.shape[1] - 1:
@@ -189,7 +214,8 @@ def cut_out_interval(data, interval, with_gaps=False):
     else:
         # masking (cutting out) all columns
         data = data[:, mask]
-    return data
+
+    return data, start_str, stop_str
 
 
 def _get_interval_idx(data, interval):

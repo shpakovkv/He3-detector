@@ -31,7 +31,12 @@ def file_processing(filename,
                     save_graph=False,
                     show_graph=False,
                     verbose=1,
-                    cut_intervals=None):
+                    cut_intervals=None,
+                    save_graph_to=None):
+
+    if save_graph_to is None:
+        save_graph_to = "Graph"
+
     if verbose > 0:
         print()
         print("Файл \"{}\"".format(os.path.basename(filename)))
@@ -46,7 +51,7 @@ def file_processing(filename,
         data = get_sum_by_number_of_channels(data, 4)
 
     if cut_intervals:
-        data = cut_out_all_intervals(data, cut_intervals)
+        data = cut_out_all_intervals(data, cut_intervals, verbose=verbose)
 
     rates, err_rates, gaps = get_counting_rate(data)
     if verbose > 0:
@@ -61,7 +66,9 @@ def file_processing(filename,
         write_data(data, base_out_name, group_by_sec, verbose)
 
     if make_graph:
-        make_k15_graph(data, group_by_4, group_by_sec, base_out_name, save_graph, show_graph, verbose)
+        make_k15_graph(data, group_by_4, group_by_sec, base_out_name, save_graph, show_graph,
+                       save_dir=save_graph_to,
+                       verbose=verbose)
 
     # graph_name = os.path.join(base_out_name, "graph_1-4_and_9-12", base_out_name)
     # graph_all(data_grouped_by_4, [1, 0, 1], labels=["Sum 1+2+3+4", "", "Sum 9+10+11+12"])
@@ -79,8 +86,13 @@ def process_k15_and_sc(k15_file,
                        show_graph=False,
                        verbose=1,
                        shift_k15_seconds=0,
-                       cut_intervals=None
+                       cut_intervals=None,
+                       save_graph_to=None
                        ):
+
+    if save_graph_to is None:
+        save_graph_to = "Graph"
+
     if not isinstance(sc_file_list, list):
         sc_file_list = [sc_file_list]
 
@@ -115,15 +127,18 @@ def process_k15_and_sc(k15_file,
     # print(" until ")
     # print(datetime.datetime.fromtimestamp(int(data_sc[0, -1])).strftime('%H:%M:%S'))
 
-    if cut_intervals:
-        data_k15 = cut_out_all_intervals(data_k15, cut_intervals)
-        data_sc = cut_out_all_intervals(data_sc, cut_intervals)
-
-    rates_sc, err_rates_sc, gaps_sc = get_counting_rate(data_sc)
-    rates_k15, err_rates_k15, gaps_k15 = get_counting_rate(data_k15)
     if verbose > 0:
         print()
         print("Файл \"{}\"".format(os.path.basename(k15_file)))
+
+    if cut_intervals:
+        data_k15 = cut_out_all_intervals(data_k15, cut_intervals, verbose=verbose)
+        data_sc = cut_out_all_intervals(data_sc, cut_intervals, verbose=0)
+
+    rates_sc, err_rates_sc, gaps_sc = get_counting_rate(data_sc)
+    rates_k15, err_rates_k15, gaps_k15 = get_counting_rate(data_k15)
+
+    if verbose > 0:
         print_time_bounds(data_k15[0, 0], data_k15[0, -1])
         print_k15_rates(data_k15, rates_k15, err_rates_k15, gaps_k15, group_by_4, verbose)
 
@@ -141,7 +156,9 @@ def process_k15_and_sc(k15_file,
         write_data(data_k15, base_out_name, group_by_sec, verbose)
 
     if make_graph:
-        make_k15_graph(data_k15, group_by_4, group_by_sec, base_out_name, save_graph, show_graph, verbose)
+        make_k15_graph(data_k15, group_by_4, group_by_sec, base_out_name, save_graph, show_graph,
+                       save_dir=save_graph_to,
+                       verbose=verbose)
         if data_sc_average is None:
             # rates == list of avgs for all channels
             cols = data_sc.shape[0]
@@ -157,6 +174,7 @@ def process_k15_and_sc(k15_file,
                               base_out_name=base_out_name,
                               save_graph=save_graph,
                               show_graph=show_graph,
+                              save_dir=save_graph_to,
                               verbose=verbose)
 
 
@@ -190,13 +208,15 @@ def print_files_from_interval(fname_list, file_borders_list, start, stop):
         print("      \"{}\"".format(os.path.basename(fname_list[idx])))
 
 
-def make_k15_graph(data, group_by_4, group_by_sec, base_out_name, save_graph, show_graph, verbose):
+def make_k15_graph(data, group_by_4, group_by_sec, base_out_name, save_graph, show_graph, save_dir=None, verbose=0):
     save_graph_as = None
     base_dir = os.path.dirname(base_out_name)
     parent_dir = os.path.dirname(base_dir)
     base_name = os.path.basename(base_out_name)
+    if save_dir is None:
+        save_dir = "Graph"
     if save_graph:
-        save_graph_as = os.path.join(parent_dir, "Graph", base_name)
+        save_graph_as = os.path.join(parent_dir, save_dir, base_name)
     scatter_graph = False
     if group_by_sec:
         scatter_graph = True
@@ -231,13 +251,15 @@ def make_k15_graph(data, group_by_4, group_by_sec, base_out_name, save_graph, sh
         plt.show()
 
 
-def make_k15_and_sc_graph(data_k15, data_sc, data_sc_avg=None, group_by_4=False, base_out_name="", save_graph=False, show_graph=False, verbose=0):
+def make_k15_and_sc_graph(data_k15, data_sc, data_sc_avg=None, group_by_4=False, base_out_name="", save_graph=False, show_graph=False, save_dir=None, verbose=0):
     save_graph_as = None
     base_dir = os.path.dirname(base_out_name)
     parent_dir = os.path.dirname(base_dir)
     base_name = os.path.basename(base_out_name)
+    if save_dir is None:
+        save_dir = "Graph"
     if save_graph:
-        save_graph_as = os.path.join(parent_dir, "Graph", "SlowControl_" + base_name)
+        save_graph_as = os.path.join(parent_dir, save_dir, "SlowControl_" + base_name)
 
     if group_by_4:
         if save_graph:
