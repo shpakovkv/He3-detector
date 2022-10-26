@@ -15,10 +15,12 @@ import re
 import os
 import numpy as np
 import datetime
+import pytz
 
 
 SLOW_CONTROL_DATA_COLUMNS = 11
 SC_VAL_POS = {"voltage": 0, "current": 2}
+TIMEZONE = pytz.timezone("Europe/Moscow")
 
 
 def get_file_list(path, sort_by_name=False, sort_by_ctime=False):
@@ -74,10 +76,10 @@ def get_time(raw_line):
     return hour, min, sec
 
 
-def get_time_stamp(raw_line, shift_seconds=0):
+def get_time_stamp(raw_line, shift_seconds=0, tz=TIMEZONE):
     day, month, year = get_date(raw_line)
     hour, min, sec = get_time(raw_line)
-    date_and_time = datetime.datetime(year, month, day, hour, min, sec, tzinfo=None)
+    date_and_time = datetime.datetime(year, month, day, hour, min, sec, tzinfo=tz)
     shift = datetime.timedelta(seconds=shift_seconds)
     date_and_time += shift
     return date_and_time.timestamp()
@@ -97,7 +99,7 @@ def get_k15_data(raw_lines, shift_seconds=0):
     points = len(raw_lines)
     data = np.ndarray(shape=(rows, points), dtype=np.int64)
     for point, raw_line in enumerate(raw_lines):
-        timestamp = get_time_stamp(raw_line, shift_seconds=shift_seconds)
+        timestamp = get_time_stamp(raw_line, shift_seconds=shift_seconds, tz=TIMEZONE)
         data[0, point] = timestamp
         line_tail = get_k15_line_tail(raw_line)
         for row, val in enumerate(int(word) for word in line_tail.split()):
@@ -132,7 +134,7 @@ def get_slow_control_data(raw_lines, shift_seconds=0):
     data = np.zeros(shape=(rows_to_store, points), dtype=np.int64)
 
     for point, raw_line in enumerate(raw_lines):
-        timestamp = get_time_stamp(raw_line, shift_seconds)
+        timestamp = get_time_stamp(raw_line, shift_seconds, tz=TIMEZONE)
         data[0, point] = timestamp
         values = get_slow_control_values(raw_line)
         data[1, point] = int(float(values[SC_VAL_POS["voltage"]]) * 1000)

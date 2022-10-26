@@ -31,6 +31,7 @@ def file_processing(filename,
                     save_graph=False,
                     show_graph=False,
                     verbose=1,
+                    shift_k15_seconds=0,
                     cut_intervals=None,
                     save_graph_to=None):
 
@@ -42,7 +43,7 @@ def file_processing(filename,
         print("Файл \"{}\"".format(os.path.basename(filename)))
 
     raw_lines = get_raw_lines(filename)
-    data = get_k15_data(raw_lines)
+    data = get_k15_data(raw_lines, shift_k15_seconds)
 
     if filter128:
         filter_128(data)

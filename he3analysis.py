@@ -14,9 +14,12 @@ import datetime
 from matplotlib import dates as md
 from k15reader import get_time, get_date
 from datetime import datetime
+from datetime import timezone
+import pytz
 
 DEFAULT_SEC_PER_RECORD = 1.025
 ERR_COEF = 1.1
+TIMEZONE = pytz.timezone("Europe/Moscow")
 
 # minimum time step in the records
 MIN_TIME_STEP = 1
@@ -101,6 +104,7 @@ def cut_out_all_intervals(data, list_of_intervals, with_gaps=False, verbose=0):
 
     # if nothing to cut, return
     if not list_of_intervals:
+        print(" NO CUT")
         return data
 
     # TODO: verbose cutting (output of real boundaries of cut out intervals)
@@ -141,10 +145,10 @@ def convert_intervals_to_timestamp(list_of_intervals, data):
             try:
                 day, month, year = get_date(time)
             except AssertionError:
-                base = datetime.fromtimestamp(data[0, 0])
+                base = datetime.fromtimestamp(data[0, 0], tz=TIMEZONE)
                 day, month, year = base.day, base.month, base.year
-            hour, min, sec = get_time(time)
-            date_and_time = datetime(year, month, day, hour, min, sec, tzinfo=None)
+            hour, mins, sec = get_time(time)
+            date_and_time = datetime(year, month, day, hour, mins, sec, tzinfo=TIMEZONE)
             interval_ts.append(date_and_time.timestamp())
         assert interval_ts[1] > interval_ts[0], \
             "Left interval border ({}) is greater than the right ({}).".format(list_of_intervals[idx][0], list_of_intervals[idx][1])
@@ -201,8 +205,8 @@ def cut_out_interval(data, interval, with_gaps=False):
     # right border value is included
     mask[idx_start:idx_stop + 1] = False
 
-    start_str = datetime.fromtimestamp(data[0, idx_start]).strftime("%Y.%m.%d %H:%M:%S")
-    stop_str = datetime.fromtimestamp(data[0, idx_stop]).strftime("%Y.%m.%d %H:%M:%S")
+    start_str = datetime.fromtimestamp(data[0, idx_start], tz=TIMEZONE).strftime("%Y.%m.%d %H:%M:%S")
+    stop_str = datetime.fromtimestamp(data[0, idx_stop], tz=TIMEZONE).strftime("%Y.%m.%d %H:%M:%S")
 
     # add nan if cutting inner interval
     if with_gaps and idx_start > 0 and idx_stop < data.shape[1] - 1:
@@ -265,7 +269,7 @@ def print_k15_rates(data, rates, err_rates, gaps, group_by_4, verbose):
         print("Ср. кв. отклонение            = [{}]".format(err_rates_str))
     # print(", Погрешность [1/с] = {}".format(err_rates))
 
-    print("Длительность регистрации: {} сек. Количество записей: {}."
+    print("Длительность регистрации: {} сек. Количество строк: {}."
           "".format(data[0, -1] - data[0, 0] + (data[0, 1] - data[0, 0]), data.shape[1]))
     if gaps:
         print("Присутствуют пропуски ({} шт) длительностью: {} сек"
@@ -297,7 +301,7 @@ def print_sc_average(data, rates, err_rates, gaps, verbose=2):
     print("Среднее кв. отклонение      = [{}]".format(err_rates_str))
     # print(", Погрешность [1/с] = {}".format(err_rates))
 
-    print("Длительность регистрации: {} сек. Количество записей: {}."
+    print("Длительность регистрации: {} сек. Количество строк: {}."
           "".format(data[0, -1] - data[0, 0] + (data[0, 1] - data[0, 0]), data.shape[1]))
     if gaps:
         print("Присутствуют пропуски ({} шт) длительностью: {} сек"
@@ -524,8 +528,8 @@ def print_overflow_128(data):
 def unix_datetime_to_str(utime, fmt=None):
     if fmt is None:
         fmt = "%Y_%m_%d %H:%M:%S"
-    return datetime.datetime.fromtimestamp(utime).strftime(fmt)
-    # return datetime.datetime.utcfromtimestamp(utime).strftime(fmt)
+    return datetime.fromtimestamp(utime, tz=TIMEZONE).strftime(fmt)
+    # return datetime.utcfromtimestamp(utime, tz=TIMEZONE).strftime(fmt)
 
 
 def space_padded_num(num, digits):
@@ -540,21 +544,21 @@ def get_sc_ibounds(k15_data, sc_data):
     stop_k15_time = k15_data[0, -1]
     
     # print("K15 Started at ({}) and finished at ({})"
-    #       "".format(datetime.datetime.fromtimestamp(start_k15_time).strftime("%d.%m.%Y %H:%M:%S"),
-    #                 datetime.datetime.fromtimestamp(stop_k15_time).strftime("%d.%m.%Y %H:%M:%S")))
+    #       "".format(datetime.fromtimestamp(start_k15_time, tz=TIMEZONE).strftime("%d.%m.%Y %H:%M:%S"),
+    #                 datetime.fromtimestamp(stop_k15_time, tz=TIMEZONE).strftime("%d.%m.%Y %H:%M:%S")))
     # print("SlowControl Started at ({}) and finished at ({})"
-    #       "".format(datetime.datetime.fromtimestamp(sc_data[0, 0]).strftime("%d.%m.%Y %H:%M:%S"),
-    #                 datetime.datetime.fromtimestamp(sc_data[0, -1]).strftime("%d.%m.%Y %H:%M:%S")))
+    #       "".format(datetime.fromtimestamp(sc_data[0, 0], tz=TIMEZONE).strftime("%d.%m.%Y %H:%M:%S"),
+    #                 datetime.fromtimestamp(sc_data[0, -1], tz=TIMEZONE).strftime("%d.%m.%Y %H:%M:%S")))
     assert start_k15_time < sc_data[0, -1], \
         "Error! SlowControl data registration finished earlier ({}) " \
         "than K15 data registration started ({})." \
-        "".format(datetime.datetime.fromtimestamp(sc_data[0, -1]).strftime("%d.%m.%Y %H:%M:%S"),
-                  datetime.datetime.fromtimestamp(start_k15_time).strftime("%d.%m.%Y %H:%M:%S"))
+        "".format(datetime.fromtimestamp(sc_data[0, -1], tz=TIMEZONE).strftime("%d.%m.%Y %H:%M:%S"),
+                  datetime.fromtimestamp(start_k15_time, tz=TIMEZONE).strftime("%d.%m.%Y %H:%M:%S"))
     assert stop_k15_time > sc_data[0, 0], \
         "Error! K15 data registration finished earlier ({}) " \
         "than SlowControl data registration started ({})." \
-        "".format(datetime.datetime.fromtimestamp(stop_k15_time).strftime("%d.%m.%Y %H:%M:%S"),
-                  datetime.datetime.fromtimestamp(sc_data[0, 0]).strftime("%d.%m.%Y %H:%M:%S"))
+        "".format(datetime.fromtimestamp(stop_k15_time, tz=TIMEZONE).strftime("%d.%m.%Y %H:%M:%S"),
+                  datetime.fromtimestamp(sc_data[0, 0], tz=TIMEZONE).strftime("%d.%m.%Y %H:%M:%S"))
     start_sc_idx = None
     stop_sc_idx = None
     for idx in range(sc_data.shape[1]):
