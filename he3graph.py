@@ -3,6 +3,10 @@ from he3analysis import convert_time
 from matplotlib import pyplot as plt
 from matplotlib import dates as md
 import datetime
+import pytz
+
+
+TIMEZONE = pytz.timezone("Etc/GMT+3")
 
 
 def graph_k15(data, mask=None, unixtime=True, labels=None, save_as=None, show_graph=False, scatter=False):
@@ -34,7 +38,7 @@ def graph_k15(data, mask=None, unixtime=True, labels=None, save_as=None, show_gr
 
     # Use a DateFormatter to set the data to the correct format.
     local_time_zone = datetime.datetime.now().astimezone().tzinfo
-    date_formatter = md.DateFormatter(date_fmt, tz=local_time_zone)
+    date_formatter = md.DateFormatter(date_fmt, tz=TIMEZONE)
     ax.xaxis.set_major_formatter(date_formatter)
 
     # Sets the tick labels diagonal so they fit easier.
@@ -106,7 +110,7 @@ def graph_k15_and_sc(data_k15, data_sc, data_sc_avg=None, mask=None, unixtime=Tr
 
     # Use a DateFormatter to set the data to the correct format.
     local_time_zone = datetime.datetime.now().astimezone().tzinfo
-    date_formatter = md.DateFormatter(date_fmt, tz=local_time_zone)
+    date_formatter = md.DateFormatter(date_fmt, tz=TIMEZONE)
     ax[2].xaxis.set_major_formatter(date_formatter)
 
     # Sets the tick labels diagonal so they fit easier.

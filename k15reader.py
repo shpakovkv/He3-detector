@@ -20,7 +20,7 @@ import pytz
 
 SLOW_CONTROL_DATA_COLUMNS = 11
 SC_VAL_POS = {"voltage": 0, "current": 2}
-TIMEZONE = pytz.timezone("Europe/Moscow")
+TIMEZONE = pytz.timezone("Etc/GMT+3")
 
 
 def get_file_list(path, sort_by_name=False, sort_by_ctime=False):
@@ -78,8 +78,8 @@ def get_time(raw_line):
 
 def get_time_stamp(raw_line, shift_seconds=0, tz=TIMEZONE):
     day, month, year = get_date(raw_line)
-    hour, min, sec = get_time(raw_line)
-    date_and_time = datetime.datetime(year, month, day, hour, min, sec, tzinfo=tz)
+    hour, mins, sec = get_time(raw_line)
+    date_and_time = datetime.datetime(year, month, day, hour, mins, sec, tzinfo=tz)
     shift = datetime.timedelta(seconds=shift_seconds)
     date_and_time += shift
     return date_and_time.timestamp()

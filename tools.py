@@ -13,6 +13,7 @@ from he3analysis import print_sc_average
 from he3analysis import get_sc_ibounds
 from he3analysis import get_counting_rate
 from he3analysis import cut_out_all_intervals
+from he3analysis import validate_filter128_err
 
 import os
 import numpy as np
@@ -20,6 +21,10 @@ from matplotlib import pyplot as plt
 from matplotlib import dates as md
 import datetime
 from pathlib import Path
+import pytz
+
+
+TIMEZONE = pytz.timezone("Etc/GMT+3")
 
 
 def file_processing(filename,
@@ -46,7 +51,7 @@ def file_processing(filename,
     data = get_k15_data(raw_lines, shift_k15_seconds)
 
     if filter128:
-        filter_128(data)
+        filter_128(data, verbose)
 
     if group_by_4:
         data = get_sum_by_number_of_channels(data, 4)
@@ -110,7 +115,7 @@ def process_k15_and_sc(k15_file,
     data_sc = get_combined_data_with_gaps(list_of_data_sc)
 
     if filter128:
-        filter_128(data_k15)
+        filter_128(data_k15, verbose)
 
     if group_by_4:
         data_k15 = get_sum_by_number_of_channels(data_k15, 4)
@@ -124,9 +129,9 @@ def process_k15_and_sc(k15_file,
 
     data_sc = data_sc[:, start_sc_idx: stop_sc_idx]
     # print("SC data used from ")
-    # print(datetime.datetime.fromtimestamp(int(data_sc[0, 0])).strftime('%H:%M:%S'), end="")
+    # print(datetime.datetime.fromtimestamp(int(data_sc[0, 0]), tz=TIMEZONE).strftime('%H:%M:%S'), end="")
     # print(" until ")
-    # print(datetime.datetime.fromtimestamp(int(data_sc[0, -1])).strftime('%H:%M:%S'))
+    # print(datetime.datetime.fromtimestamp(int(data_sc[0, -1]), tz=TIMEZONE).strftime('%H:%M:%S'))
 
     if verbose > 0:
         print()
@@ -180,9 +185,9 @@ def process_k15_and_sc(k15_file,
 
 
 def print_time_bounds(start, stop):
-    dt_start = datetime.datetime.fromtimestamp(start)
-    dt_stop = datetime.datetime.fromtimestamp(stop)
-    print("Интервал от {} до {} включительно"
+    dt_start = datetime.datetime.fromtimestamp(start, tz=TIMEZONE)
+    dt_stop = datetime.datetime.fromtimestamp(stop, tz=TIMEZONE)
+    print("Обработан интервал от {} до {} включительно"
           "".format(dt_start.strftime("%Y.%m.%d %H:%M:%S"),
                     dt_stop.strftime("%Y.%m.%d %H:%M:%S")))
 
@@ -427,7 +432,7 @@ def graph_timeline(data_k15, data_sc, title=None, ylabel_list=None, y2_ticks_ste
 
     # Use a DateFormatter to set the data to the correct format.
     local_time_zone = datetime.datetime.now().astimezone().tzinfo
-    date_formatter = md.DateFormatter(date_fmt, tz=local_time_zone)
+    date_formatter = md.DateFormatter(date_fmt, tz=TIMEZONE)
     ax[2].xaxis.set_major_formatter(date_formatter)
     # Sets the tick labels diagonal so they fit easier.
 

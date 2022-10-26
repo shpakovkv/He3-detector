@@ -15,14 +15,99 @@ from matplotlib import dates as md
 from k15reader import get_time, get_date
 from datetime import datetime
 from datetime import timezone
+from math import isnan, nan
 import pytz
 
 DEFAULT_SEC_PER_RECORD = 1.025
 ERR_COEF = 1.1
-TIMEZONE = pytz.timezone("Europe/Moscow")
+TIMEZONE = pytz.timezone("Etc/GMT+3")
+FILTER128_TOLERANCE = 0.20
 
 # minimum time step in the records
 MIN_TIME_STEP = 1
+
+
+def get_filter128_error_single(array_1d):
+    """Calculates relative error for 128-filtering process
+    for specified 1d array.
+
+    :param array_1d: 1D array with data
+    :type array_1d: np.ndarray
+
+    :return: mean error, min error, max error (relative)
+    :rtype: tuple
+    """
+    below128 = array_1d[array_1d < 128].astype(np.float64)
+    above127 = array_1d[array_1d > 127].astype(np.float64)
+    above127 = ll_filter_128(above127)
+    if below128.size == 0:
+        return 1.0, 1.0, 1.0, len(below128), len(above127)
+    if above127.size == 0:
+        return 0.0, 0.0, 0.0, len(below128), len(above127)
+
+    mean_rel_err = nan
+    min_rel_err = nan
+    max_rel_err = nan
+
+    if np.nanmean(below128) > 0.0:
+        mean_rel_err = abs(np.nanmean(below128) - np.nanmean(above127)) / np.nanmean(below128)
+    if below128.min() > 0:
+        min_rel_err = abs(np.min(below128) - np.min(above127)) / below128.min()
+    if np.max(below128) > 0:
+        max_rel_err = abs(np.max(below128) - np.max(above127)) / np.max(below128)
+
+    return mean_rel_err, min_rel_err, max_rel_err, len(below128), len(above127)
+
+
+def get_filter128_error_all(data):
+    """Calculates relative error for 128-filtering process
+    for all columns of the input data array.
+
+    :param data: 2D array with numeric data
+    :type data: np.ndarray
+
+    :return: list of relative errors (for mean, min, max values) for all channels
+    :rtype: list of tuple
+    """
+    errors_list = list()
+    for column in data:
+        errors_list.append(get_filter128_error_single(column))
+    return errors_list
+
+
+def validate_filter128_err(data, tolerance_rel, verbose=0):
+    """Validate relative error for 128-filtering process
+    for all channels of the input data array.
+
+    May print messages during process.
+
+    return
+
+    :param data: 2D array with detectors data, data[1] - time col, data[1:] - data channels
+    :type data: np.ndarray
+    :param tolerance_rel: relative tolerance
+    :type tolerance_rel: float
+    :param verbose: level of verbosity
+    :type verbose: int
+
+    :return: list of relative errors (for mean, min, max values) for all channels and list of validation (bool)
+    :rtype: tuple
+    """
+    labels = ("mean", "minimum", "maximum")
+    errors_list = get_filter128_error_all(data[1:])
+    valid_list = [True] * len(errors_list)
+    for ch, err_tuple in enumerate(errors_list):
+        for idx, err in enumerate(err_tuple[:-2]):
+            if not isnan(err) and err > tolerance_rel:
+                valid_list[ch] = False
+                if verbose > 1:
+                    print(f"Warning! CH[{ch}] {labels[idx]} filter128 error ({err * 100}%) "
+                          f"has exceeded the allowable value ({tolerance_rel * 100}%)!")
+    if verbose > 0:
+        if not all(valid_list):
+            print(f"(!!) WARNING! filter128 error has exceeded the allowable value "
+                  f"{tolerance_rel * 100}% for {len(valid_list) - sum(valid_list)} channel(s)")
+    return errors_list, valid_list
 
 
 def get_extreme_deviation_intervals(time, value):
@@ -148,7 +233,7 @@ def convert_intervals_to_timestamp(list_of_intervals, data):
                 base = datetime.fromtimestamp(data[0, 0], tz=TIMEZONE)
                 day, month, year = base.day, base.month, base.year
             hour, mins, sec = get_time(time)
-            date_and_time = datetime(year, month, day, hour, mins, sec, tzinfo=TIMEZONE)
+            date_and_time = datetime(year, month, day, hour, mins, sec, 0, TIMEZONE)
             interval_ts.append(date_and_time.timestamp())
         assert interval_ts[1] > interval_ts[0], \
             "Left interval border ({}) is greater than the right ({}).".format(list_of_intervals[idx][0], list_of_intervals[idx][1])
@@ -252,9 +337,15 @@ def _get_interval_idx(data, interval):
     return start, stop
 
 
+# def convert_time(time, unixtime):
+#     if unixtime:
+#         return md.epoch2num(time)
+#     return time
+
+
 def convert_time(time, unixtime):
     if unixtime:
-        return md.epoch2num(time)
+        return [datetime.fromtimestamp(ts, tz=TIMEZONE) for ts in time]
     return time
 
 
@@ -269,8 +360,9 @@ def print_k15_rates(data, rates, err_rates, gaps, group_by_4, verbose):
         print("Ср. кв. отклонение            = [{}]".format(err_rates_str))
     # print(", Погрешность [1/с] = {}".format(err_rates))
 
-    print("Длительность регистрации: {} сек. Количество строк: {}."
-          "".format(data[0, -1] - data[0, 0] + (data[0, 1] - data[0, 0]), data.shape[1]))
+    if verbose > 1:
+        print("Длительность регистрации: {} сек. Количество строк: {}."
+              "".format(data[0, -1] - data[0, 0] + (data[0, 1] - data[0, 0]), data.shape[1]))
     if gaps:
         print("Присутствуют пропуски ({} шт) длительностью: {} сек"
               "".format(len(gaps), gaps))
@@ -301,8 +393,9 @@ def print_sc_average(data, rates, err_rates, gaps, verbose=2):
     print("Среднее кв. отклонение      = [{}]".format(err_rates_str))
     # print(", Погрешность [1/с] = {}".format(err_rates))
 
-    print("Длительность регистрации: {} сек. Количество строк: {}."
-          "".format(data[0, -1] - data[0, 0] + (data[0, 1] - data[0, 0]), data.shape[1]))
+    if verbose > 1:
+        print("Длительность регистрации: {} сек. Количество строк: {}."
+              "".format(data[0, -1] - data[0, 0] + (data[0, 1] - data[0, 0]), data.shape[1]))
     if gaps:
         print("Присутствуют пропуски ({} шт) длительностью: {} сек"
               "".format(len(gaps), gaps))
@@ -474,7 +567,7 @@ def get_counting_rate(data, sec_per_record=DEFAULT_SEC_PER_RECORD):
     for row in range(1, data.shape[0]):
         rate = sum(data[row, :]) / float(records_num)
         res.append(rate)
-        std_dev.append(np.std(data[row, :]))
+        std_dev.append(np.std(data[row, :] / float(records_num)))
     return res, std_dev, there_are_gaps
 
 
@@ -502,7 +595,26 @@ def leave_128_only(data):
     data[1:] = ll_get_128_only(data[1:])
 
 
-def filter_128(data):
+def filter_128(data, verbose):
+    verb = 1
+    if verbose == 0:
+        verb = 0
+    err_list, valid_list = validate_filter128_err(data, FILTER128_TOLERANCE, verbose=verb)
+    err_label = ("mean value error (in %)",
+                 "minimum value error (in %)",
+                 "maximum value error (in %)",
+                 "below 128 number",
+                 "above 127 number")
+    if verbose > 0:
+        for idx, vals in enumerate(zip(*err_list)):
+            if idx < 3:
+                # ERR VALUES
+                print(f"Filter128 {err_label[idx]} by channel: "
+                      f"[{', '.join(str(val * 100 ) for val in vals)}]")
+            else:
+                # NUMBER OF VALUES
+                print(f"Filter128 {err_label[idx]} by channel: "
+                      f"[{', '.join(str(val) for val in vals)}]")
     data[1:] = ll_filter_128(data[1:])
 
 
@@ -514,7 +626,7 @@ def print_overflow_128(data):
     for idx in range(number_of_records):
         if any(val > 127 for val in data[1:, idx]):
             print()
-            msg = unix_datetime_to_str(data[0, idx])
+            msg = unix_datetime_to_str(data[0, idx], tz=TIMEZONE)
             msg += "         "
             msg += ""
             msg += " ".join(space_padded_num(val, 3) for val in data[1:, idx])
@@ -525,7 +637,7 @@ def print_overflow_128(data):
             print(msg)
 
 
-def unix_datetime_to_str(utime, fmt=None):
+def unix_datetime_to_str(utime, fmt=None, tz=TIMEZONE):
     if fmt is None:
         fmt = "%Y_%m_%d %H:%M:%S"
     return datetime.fromtimestamp(utime, tz=TIMEZONE).strftime(fmt)
