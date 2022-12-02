@@ -17,6 +17,7 @@ from datetime import datetime
 from datetime import timezone
 from math import isnan, nan
 import pytz
+from dataclasses import dataclass
 
 DEFAULT_SEC_PER_RECORD = 1.025
 ERR_COEF = 1.1
@@ -27,87 +28,128 @@ FILTER128_TOLERANCE = 0.20
 MIN_TIME_STEP = 1
 
 
-def get_filter128_error_single(array_1d):
-    """Calculates relative error for 128-filtering process
-    for specified 1d array.
+@dataclass
+class Stats:
+    length: int
+    mean: float = nan
+    max: float = nan
+    min: float = nan
+
+
+def get_vector_stats(array_1d):
+    """Calculates array Stats (length, mean, max, min).
 
     :param array_1d: 1D array with data
     :type array_1d: np.ndarray
 
-    :return: mean error, min error, max error (relative)
-    :rtype: tuple
+    :return: array Stats
+    :rtype: Stats
     """
-    below128 = array_1d[array_1d < 128].astype(np.float64)
-    above127 = array_1d[array_1d > 127].astype(np.float64)
-    above127 = ll_filter_128(above127)
-    if below128.size == 0:
-        return 1.0, 1.0, 1.0, len(below128), len(above127)
-    if above127.size == 0:
-        return 0.0, 0.0, 0.0, len(below128), len(above127)
 
-    mean_rel_err = nan
-    min_rel_err = nan
-    max_rel_err = nan
+    if array_1d.size == 0:
+        return Stats(array_1d.size)
 
-    if np.nanmean(below128) > 0.0:
-        mean_rel_err = abs(np.nanmean(below128) - np.nanmean(above127)) / np.nanmean(below128)
-    if below128.min() > 0:
-        min_rel_err = abs(np.min(below128) - np.min(above127)) / below128.min()
-    if np.max(below128) > 0:
-        max_rel_err = abs(np.max(below128) - np.max(above127)) / np.max(below128)
+    the_sats = Stats(length=array_1d.size,
+                     mean=np.nanmean(array_1d),
+                     min=np.nanmin(array_1d),
+                     max=np.nanmax(array_1d))
 
-    return mean_rel_err, min_rel_err, max_rel_err, len(below128), len(above127)
+    return the_sats
 
 
-def get_filter128_error_all(data):
-    """Calculates relative error for 128-filtering process
+def get_below128_and_above128_stats(data):
+    """Calculates statistics (length, mean, min, max) of below128 values and above127 values
     for all columns of the input data array.
 
     :param data: 2D array with numeric data
     :type data: np.ndarray
 
-    :return: list of relative errors (for mean, min, max values) for all channels
+    :return: below128 Stats list and above127 Stats list
+    :rtype: tuple of list
+    """
+    below128_stats_list = list()
+    above127_stats_list = list()
+    for column in data:
+        below = get_vector_stats(column[column < 128])
+        below128_stats_list.append(below)
+
+        above127 = column[column > 127].astype(np.float64)
+        above127 = ll_filter_128(above127)
+        above127_stats_list.append(get_vector_stats(above127))
+
+    return below128_stats_list, above127_stats_list
+
+
+def get_filter128_relative_diff(below128_stats, above127_stats):
+    """ Calculates relative difference of below128 and above127
+     mean value, minimum value and maximum value.
+     Rel_diff = abs(below_val - above_val) / below_val
+
+    :param below128_stats: below 128 values Stats
+    :type below128_stats: Stats
+    :param above127_stats: above 127 values stats
+    :type above127_stats: Stats
+    :return: relative difference of mean value, minimum value and maximum value
+    :rtype: tuple of float
+    """
+
+    if below128_stats.length == 0:
+        return 1.0, 1.0, 1.0
+    if above127_stats.length == 0:
+        return 0.0, 0.0, 0.0
+
+    mean_rel_diff = nan
+    min_rel_diff = nan
+    max_rel_diff = nan
+
+    if below128_stats.mean > 0.0:
+        mean_rel_diff = abs(below128_stats.mean - above127_stats.mean) / below128_stats.mean
+    if below128_stats.min > 0:
+        min_rel_diff = abs(below128_stats.min - above127_stats.min) / below128_stats.min
+    if below128_stats.max > 0:
+        max_rel_diff = abs(below128_stats.max - above127_stats.max) / below128_stats.max
+
+    return mean_rel_diff, min_rel_diff, max_rel_diff
+
+
+def get_filter128_relative_diff_list(below128_stats_list, above127_stats_list):
+    """ Calculates relative difference of below128 and above127
+     mean value, minimum value and maximum value for all data columns.
+
+    :param below128_stats_list: list of below 128 values Stats
+    :type below128_stats_list: list of Stats
+    :param above127_stats_list: list of above 127 values stats
+    :type above127_stats_list: list of Stats
+    :return: relative difference of mean value, minimum value and maximum value
     :rtype: list of tuple
     """
-    errors_list = list()
-    for column in data:
-        errors_list.append(get_filter128_error_single(column))
-    return errors_list
+    rel_diff_list = list()
+    for below_stats, above_stats in zip(below128_stats_list, above127_stats_list):
+        rel_diff_list.append(get_filter128_relative_diff(below_stats, above_stats))
+    return rel_diff_list
 
 
-def validate_filter128_err(data, tolerance_rel, verbose=0):
+def get_validation_of_filter128(data):
     """Validate relative error for 128-filtering process
     for all channels of the input data array.
 
-    May print messages during process.
-
-    return
+    Returns below128 Stats list, above127 Stats list, relative diff list
 
     :param data: 2D array with detectors data, data[1] - time col, data[1:] - data channels
     :type data: np.ndarray
-    :param tolerance_rel: relative tolerance
-    :type tolerance_rel: float
-    :param verbose: level of verbosity
-    :type verbose: int
 
-    :return: list of relative errors (for mean, min, max values) for all channels and list of validation (bool)
+    :return: tuple of: below128 Stats list, above127 Stats list, relative diffs
     :rtype: tuple
     """
-    labels = ("mean", "minimum", "maximum")
-    errors_list = get_filter128_error_all(data[1:])
-    valid_list = [True] * len(errors_list)
-    for ch, err_tuple in enumerate(errors_list):
-        for idx, err in enumerate(err_tuple[:-2]):
-            if not isnan(err) and err > tolerance_rel:
-                valid_list[ch] = False
-                if verbose > 1:
-                    print(f"Warning! CH[{ch}] {labels[idx]} filter128 error ({err * 100}%) "
-                          f"has exceeded the allowable value ({tolerance_rel * 100}%)!")
-    if verbose > 0:
-        if not all(valid_list):
-            print(f"(!!) WARNING! filter128 error has exceeded the allowable value "
-                  f"{tolerance_rel * 100}% for {len(valid_list) - sum(valid_list)} channel(s)")
-    return errors_list, valid_list
+    below128_stat_list, above127_stat_list = get_below128_and_above128_stats(data[1:])
+
+    # diff list:
+    # 0: mean
+    # 1: min
+    # 2: max
+    diff_list = get_filter128_relative_diff_list(below128_stat_list, above127_stat_list)
+
+    return below128_stat_list, above127_stat_list, diff_list
 
 
 def get_extreme_deviation_intervals(time, value):
@@ -595,26 +637,77 @@ def leave_128_only(data):
     data[1:] = ll_get_128_only(data[1:])
 
 
-def filter_128(data, verbose):
-    verb = 1
-    if verbose == 0:
-        verb = 0
-    err_list, valid_list = validate_filter128_err(data, FILTER128_TOLERANCE, verbose=verb)
-    err_label = ("mean value error (in %)",
-                 "minimum value error (in %)",
-                 "maximum value error (in %)",
-                 "below 128 number",
-                 "above 127 number")
+def validate_filter128(data, verbose):
+    """ Validate relative results of 128-filtering process
+    for all channels of the input data array.
+
+    Prints warning messages during process (uses 3 levels of verbosity).
+
+    Returns valid list (True if the filtered data makes sense,
+    False if filtered data is out of statistics of unfiltered data) for all columns.
+
+    :param data: He3 data loaded from file
+    :type data: np.ndarray
+    :param verbose: level of verbosity
+    :type verbose: int
+    :return: valid list
+    :rtype: list
+    """
+
+    # diff list:
+    # 0: mean
+    # 1: min
+    # 2: max
+    below128_stat_list, above127_stat_list, diff_list = get_validation_of_filter128(data)
+    labels = ("mean", "minimum", "maximum")
+
+    # number of values below 128
+    below_list = [val.length for val in below128_stat_list]
+    # number of values above 127
+    above_list = [val.length for val in above127_stat_list]
+
     if verbose > 0:
-        for idx, vals in enumerate(zip(*err_list)):
-            if idx < 3:
-                # ERR VALUES
-                print(f"Filter128 {err_label[idx]} by channel: "
-                      f"[{', '.join(str(val * 100 ) for val in vals)}]")
-            else:
-                # NUMBER OF VALUES
-                print(f"Filter128 {err_label[idx]} by channel: "
-                      f"[{', '.join(str(val) for val in vals)}]")
+        print(f"Соотношение значений превышающих 127 к общему количеству записей (в %): "
+              f"[{', '.join((f'{(above / (below + above) * 100):.1f}' for below, above in zip(below_list, above_list)))}]]")
+
+    valid_list = [True] * len(diff_list)
+    for ch, diff_tuple in enumerate(diff_list):
+        for idx, err in enumerate(diff_tuple):
+            if not isnan(err) and err > FILTER128_TOLERANCE:
+                valid_list[ch] = False
+                if verbose > 2:
+                    print(f"Warning! CH[{ch}] {labels[idx]} value filter128 error ({err * 100:.2f}%) "
+                          f"has exceeded the allowable value ({FILTER128_TOLERANCE * 100}%)!")
+
+        if below128_stat_list[ch].length == 0:
+            valid_list[ch] = False
+            if verbose > 0:
+                print(f"(!!) ERROR! CH[{ch}] has NO VALUES below 128 and "
+                      f"{above127_stat_list[ch].length} values above 127!")
+
+        if below128_stat_list[ch].max > 128.0 - FILTER128_TOLERANCE * 128.0 and above127_stat_list[ch].length > 0:
+            if verbose > 0:
+                print(f"(!) WARNING! CH[{ch}] maximum value below 128 ({below128_stat_list[ch].max}) is bigger than "
+                      f"the allowable value (128 - {FILTER128_TOLERANCE * 100}%)!")
+    if verbose > 0:
+        if not all(valid_list):
+            print(f"(!) WARNING! filter128 operation error has exceeded the allowable value "
+                  f"{FILTER128_TOLERANCE * 100}% for {len(valid_list) - sum(valid_list)} channel(s)")
+
+    if verbose > 1:
+        zipped_diff = list(zip(*diff_list))
+        # ERR VALUES
+        print(f"Filter128 mean value difference by channel: "
+              f"[{', '.join(f'{diff * 100:.2f}% ({below_stat.mean:.2f}/{above_stat.mean:.2f})' for diff, below_stat, above_stat in zip(zipped_diff[0], below128_stat_list, above127_stat_list))}]")
+        print(f"Filter128 minimum value difference by channel: "
+              f"[{', '.join(f'{diff * 100:.2f}% ({below_stat.min}/{above_stat.min})' for diff, below_stat, above_stat in zip(zipped_diff[1], below128_stat_list, above127_stat_list))}]")
+        print(f"Filter128 maximum value difference by channel: "
+              f"[{', '.join(f'{diff * 100:.2f}% ({below_stat.max}/{above_stat.max})' for diff, below_stat, above_stat in zip(zipped_diff[2], below128_stat_list, above127_stat_list))}]")
+
+    return valid_list
+
+
+def filter_128(data, verbose):
     data[1:] = ll_filter_128(data[1:])
 
 
