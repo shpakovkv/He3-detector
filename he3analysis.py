@@ -690,7 +690,7 @@ def validate_filter128(data, verbose):
                     warn_level += 1
                 warn_symbol = '!' * warn_level
                 warn_lv_list = ["1st", "2nd", "3rd"]
-                if verbose > 2:
+                if verbose > 1:
                     print(f"({warn_symbol}) Warning! CH[{ch + 1}] {labels[idx].upper()} value filter128 error ({err * 100:.2f}%) "
                           f"has exceeded the {warn_lv_list[warn_level - 1]} allowable level ({25 * warn_level}%)!")
 
@@ -709,7 +709,7 @@ def validate_filter128(data, verbose):
             print(f"WARNING! filter128 operation error has exceeded the allowable value "
                   f"{FILTER128_TOLERANCE * 100}% for {len(valid_list) - sum(valid_list)} channel(s)")
 
-    if verbose > 1:
+    if verbose > 2:
         zipped_diff = list(zip(*diff_list))
         # ERR VALUES
         print(f"Filter128 mean value difference by channel: "
