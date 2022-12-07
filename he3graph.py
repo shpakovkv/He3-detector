@@ -50,7 +50,7 @@ def graph_k15(data, mask=None, unixtime=True, labels=None, save_as=None, show_gr
     channels_list = [idx for idx in range(number_of_channels) if mask[idx]]
     plt.title("He³ detectors")
 
-    ax.legend()  # легенда для всего рисунка fig
+    ax.legend(loc='best')  # легенда для всего рисунка fig
     if save_as is not None:
         # assert not os.path.isfile(save_as), "A file with name {} already exists.".format(os.path.basename(save_as))
         if not os.path.isdir(os.path.dirname(save_as)):
@@ -86,14 +86,14 @@ def graph_k15_and_sc(data_k15, data_sc, data_sc_avg=None, mask=None, unixtime=Tr
 
     ax[0].plot(convert_time(data_sc[0], unixtime=unixtime), data_sc[1], '-')
     if data_sc_avg is not None:
-        ax[0].plot(convert_time(data_sc_avg[0], unixtime=unixtime), data_sc_avg[1], 's-')
+        ax[0].plot(convert_time(data_sc_avg[0], unixtime=unixtime), data_sc_avg[1], 's-', label='Voltage, V')
         avg_text = "Average {:.1f} V".format(data_sc_avg[1, 0])
         ax[0].set_title(avg_text, size=subplot_title_size)
     plt.setp(ax[0], ylabel='Voltage, V')
 
     ax[1].plot(convert_time(data_sc[0], unixtime=unixtime), data_sc[2], '-')
     if data_sc_avg is not None:
-        ax[1].plot(convert_time(data_sc_avg[0], unixtime=unixtime), data_sc_avg[2], 's-')
+        ax[1].plot(convert_time(data_sc_avg[0], unixtime=unixtime), data_sc_avg[2], 's-', label='Current, mkA')
         avg_text = "Average {:.4f} mkA".format(data_sc_avg[2, 0])
         ax[1].set_title(avg_text, size=subplot_title_size)
     plt.setp(ax[1], ylabel='Current, mkA')
@@ -125,7 +125,7 @@ def graph_k15_and_sc(data_k15, data_sc, data_sc_avg=None, mask=None, unixtime=Tr
     fig.suptitle('He³ detectors', fontsize=14)
     # plt.title("He³ detectors")
 
-    ax[2].legend()
+    ax[2].legend(loc='best')
     # plt.subplots_adjust(hspace=0)
     if save_as is not None:
         # assert not os.path.isfile(save_as), "A file with name {} already exists.".format(os.path.basename(save_as))

@@ -466,9 +466,9 @@ def get_base_output_fname(source_filename, group_by_4, group_by_sec):
     if group_by_sec > 0:
         base_out_name = os.path.join(base_out_name, fname + "_sum_by_{}_sec".format(group_by_sec))
     elif group_by_4:
-        base_out_name = os.path.join(base_out_name, fname + "_sum")
+        base_out_name = os.path.join(base_out_name, fname + "_sum_by_ch")
     else:
-        base_out_name = os.path.join(base_out_name, "graph_1-4_and_9-12", fname)
+        base_out_name = os.path.join(base_out_name, fname)
     return base_out_name
 
 
@@ -668,7 +668,7 @@ def validate_filter128(data, verbose):
 
     if verbose > 0:
         print(f"Соотношение значений превышающих 127 к общему количеству записей (в %): "
-              f"[{', '.join((f'{(above / (below + above) * 100):.1f}' for below, above in zip(below_list, above_list)))}]]")
+              f"[{', '.join((f'{(above / (below + above) * 100):.1f}' for below, above in zip(below_list, above_list)))}]")
 
     valid_list = [True] * len(diff_list)
     for ch, diff_tuple in enumerate(diff_list):

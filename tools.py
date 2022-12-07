@@ -36,6 +36,7 @@ def file_processing(filename,
                     make_graph=False,
                     save_graph=False,
                     show_graph=False,
+                    col_mask=None,
                     verbose=1,
                     shift_k15_seconds=0,
                     cut_intervals=None,
@@ -51,15 +52,15 @@ def file_processing(filename,
     raw_lines = get_raw_lines(filename)
     data = get_k15_data(raw_lines, shift_k15_seconds)
 
+    if cut_intervals:
+        data = cut_out_all_intervals(data, cut_intervals, verbose=verbose)
+
     if filter128:
         validate_filter128(data, verbose)
         filter_128(data, verbose)
 
     if group_by_4:
         data = get_sum_by_number_of_channels(data, 4)
-
-    if cut_intervals:
-        data = cut_out_all_intervals(data, cut_intervals, verbose=verbose)
 
     rates, err_rates, gaps = get_counting_rate(data)
     if verbose > 0:
@@ -76,6 +77,7 @@ def file_processing(filename,
     if make_graph:
         make_k15_graph(data, group_by_4, group_by_sec, base_out_name, save_graph, show_graph,
                        save_dir=save_graph_to,
+                       col_mask=col_mask,
                        verbose=verbose)
 
     # graph_name = os.path.join(base_out_name, "graph_1-4_and_9-12", base_out_name)
@@ -95,7 +97,8 @@ def process_k15_and_sc(k15_file,
                        verbose=1,
                        shift_k15_seconds=0,
                        cut_intervals=None,
-                       save_graph_to=None
+                       save_graph_to=None,
+                       col_mask=None
                        ):
     if verbose > 0:
         print()
@@ -119,6 +122,10 @@ def process_k15_and_sc(k15_file,
         list_of_data_sc[idx] = data
     data_sc = get_combined_data_with_gaps(list_of_data_sc)
 
+    if cut_intervals:
+        data_k15 = cut_out_all_intervals(data_k15, cut_intervals, verbose=verbose)
+        # data_sc = cut_out_all_intervals(data_sc, cut_intervals, verbose=0)
+
     if filter128:
         validate_filter128(data_k15, verbose)
         filter_128(data_k15, verbose)
@@ -138,10 +145,6 @@ def process_k15_and_sc(k15_file,
     # print(datetime.datetime.fromtimestamp(int(data_sc[0, 0]), tz=TIMEZONE).strftime('%H:%M:%S'), end="")
     # print(" until ")
     # print(datetime.datetime.fromtimestamp(int(data_sc[0, -1]), tz=TIMEZONE).strftime('%H:%M:%S'))
-
-    if cut_intervals:
-        data_k15 = cut_out_all_intervals(data_k15, cut_intervals, verbose=verbose)
-        data_sc = cut_out_all_intervals(data_sc, cut_intervals, verbose=0)
 
     rates_sc, err_rates_sc, gaps_sc = get_counting_rate(data_sc)
     rates_k15, err_rates_k15, gaps_k15 = get_counting_rate(data_k15)
@@ -166,6 +169,7 @@ def process_k15_and_sc(k15_file,
     if make_graph:
         make_k15_graph(data_k15, group_by_4, group_by_sec, base_out_name, save_graph, show_graph,
                        save_dir=save_graph_to,
+                       col_mask=col_mask,
                        verbose=verbose)
         if data_sc_average is None:
             # rates == list of avgs for all channels
@@ -183,6 +187,7 @@ def process_k15_and_sc(k15_file,
                               save_graph=save_graph,
                               show_graph=show_graph,
                               save_dir=save_graph_to,
+                              col_mask=col_mask,
                               verbose=verbose)
 
 
@@ -216,7 +221,7 @@ def print_files_from_interval(fname_list, file_borders_list, start, stop):
         print("      \"{}\"".format(os.path.basename(fname_list[idx])))
 
 
-def make_k15_graph(data, group_by_4, group_by_sec, base_out_name, save_graph, show_graph, save_dir=None, verbose=0):
+def make_k15_graph(data, group_by_4, group_by_sec, base_out_name, save_graph, show_graph, save_dir=None, col_mask=None, verbose=0):
     save_graph_as = None
     base_dir = os.path.dirname(base_out_name)
     parent_dir = os.path.dirname(base_dir)
@@ -229,27 +234,53 @@ def make_k15_graph(data, group_by_4, group_by_sec, base_out_name, save_graph, sh
     if group_by_sec:
         scatter_graph = True
     if group_by_4:
+        if col_mask is None:
+            col_mask = [1, 0, 1]
         if save_graph:
             save_graph_as += ".png"
-        graph_k15(data, [1, 0, 1], labels=["Ch1-4", "", "Ch9-12"],
+        graph_k15(data, col_mask, labels=["Ch1-4", "", "Ch9-12"],
                   save_as=save_graph_as, scatter=scatter_graph, show_graph=show_graph)
     else:
+        if col_mask is None:
+            col_mask = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         save_as = None
+
         if save_graph_as is not None:
             save_as = save_graph_as + "_Ch1-4.png"
-        graph_k15(data, [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-                  labels=["Ch1", "Ch2", "Ch3", "Ch4", "", "", "", "", "", "", "", ""],
-                  save_as=save_as,
-                  scatter=scatter_graph,
-                  show_graph=show_graph)
+        first_4_mask = [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0]
+        sub_mask = [a * b for a, b in zip(col_mask, first_4_mask)]
+        if any(sub_mask):
+            graph_k15(data,
+                      sub_mask,
+                      labels=["Ch1", "Ch2", "Ch3", "Ch4", "", "", "", "", "", "", "", ""],
+                      save_as=save_as,
+                      scatter=scatter_graph,
+                      show_graph=show_graph)
+
+        if save_graph_as is not None:
+            save_as = save_graph_as + "_Ch5-8.png"
+        second_4_mask = [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0]
+        sub_mask = [a * b for a, b in zip(col_mask, second_4_mask)]
+        if any(sub_mask):
+            graph_k15(data,
+                      sub_mask,
+                      labels=["", "", "", "", "Ch5", "Ch6", "Ch7", "Ch8", "", "", "", ""],
+                      save_as=save_as,
+                      scatter=scatter_graph,
+                      show_graph=show_graph)
+
         if save_graph_as is not None:
             save_as = save_graph_as + "_Ch9-12.png"
-        graph_k15(data, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
-                  labels=["", "", "", "", "", "", "", "", "Ch9", "Ch10", "Ch11", "Ch12", ],
-                  save_as=save_as,
-                  scatter=scatter_graph,
-                  show_graph=show_graph)
-    if verbose > 2 and save_graph_as is not None:
+        third_4_mask = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1]
+        sub_mask = [a * b for a, b in zip(col_mask, third_4_mask)]
+        if any(sub_mask):
+            graph_k15(data,
+                      sub_mask,
+                      labels=["", "", "", "", "", "", "", "", "Ch9", "Ch10", "Ch11", "Ch12"],
+                      save_as=save_as,
+                      scatter=scatter_graph,
+                      show_graph=show_graph)
+    if verbose > 3 and save_graph_as is not None:
         if group_by_4:
             print("График сохранен: {}".format(os.path.basename(save_graph_as)))
         else:
@@ -259,7 +290,7 @@ def make_k15_graph(data, group_by_4, group_by_sec, base_out_name, save_graph, sh
         plt.show()
 
 
-def make_k15_and_sc_graph(data_k15, data_sc, data_sc_avg=None, group_by_4=False, base_out_name="", save_graph=False, show_graph=False, save_dir=None, verbose=0):
+def make_k15_and_sc_graph(data_k15, data_sc, data_sc_avg=None, group_by_4=False, base_out_name="", save_graph=False, show_graph=False, save_dir=None, col_mask=None, verbose=0):
     save_graph_as = None
     base_dir = os.path.dirname(base_out_name)
     parent_dir = os.path.dirname(base_dir)
@@ -276,26 +307,48 @@ def make_k15_and_sc_graph(data_k15, data_sc, data_sc_avg=None, group_by_4=False,
         graph_k15_and_sc(data_k15,
                          data_sc,
                          data_sc_avg,
+                         mask=col_mask,
                          labels=["Ch1-4", "", "Ch9-12"],
                          save_as=save_graph_as,
                          show_graph=show_graph)
     else:
         save_as = None
+        if col_mask is None:
+            col_mask = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+
         if save_graph_as is not None:
             save_as = save_graph_as + "_Ch1-4.png"
-        graph_k15_and_sc(data_k15, data_sc, data_sc_avg,
-                         mask=[1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-                         labels=["Ch1", "Ch2", "Ch3", "Ch4", "", "", "", "", "", "", "", ""],
-                         save_as=save_as,
-                         show_graph=show_graph)
+        first_4_mask = [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0]
+        sub_mask = [a * b for a, b in zip(col_mask, first_4_mask)]
+        if any(sub_mask):
+            graph_k15_and_sc(data_k15, data_sc, data_sc_avg,
+                             mask=sub_mask,
+                             labels=["Ch1", "Ch2", "Ch3", "Ch4", "", "", "", "", "", "", "", ""],
+                             save_as=save_as,
+                             show_graph=show_graph)
+
+        if save_graph_as is not None:
+            save_as = save_graph_as + "_Ch5-8.png"
+        second_4_mask = [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0]
+        sub_mask = [a * b for a, b in zip(col_mask, second_4_mask)]
+        if any(sub_mask):
+            graph_k15_and_sc(data_k15, data_sc, data_sc_avg,
+                             mask=sub_mask,
+                             labels=["", "", "", "", "Ch5", "Ch6", "Ch7", "Ch8", "", "", "", ""],
+                             save_as=save_as,
+                             show_graph=show_graph)
+
         if save_graph_as is not None:
             save_as = save_graph_as + "_Ch9-12.png"
-        graph_k15_and_sc(data_k15, data_sc, data_sc_avg,
-                         mask=[0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
-                         labels=["", "", "", "", "", "", "", "", "Ch9", "Ch10", "Ch11", "Ch12", ],
-                         save_as=save_as,
-                         show_graph=show_graph)
-    if verbose > 1 and save_graph_as is not None:
+        third_4_mask = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1]
+        sub_mask = [a * b for a, b in zip(col_mask, third_4_mask)]
+        if any(sub_mask):
+            graph_k15_and_sc(data_k15, data_sc, data_sc_avg,
+                             mask=sub_mask,
+                             labels=["", "", "", "", "", "", "", "", "Ch9", "Ch10", "Ch11", "Ch12"],
+                             save_as=save_as,
+                             show_graph=show_graph)
+    if verbose > 3 and save_graph_as is not None:
         if group_by_4:
             print("График сохранен: {}".format(os.path.basename(save_graph_as)))
         else:
@@ -331,7 +384,7 @@ def make_timeline_graph_grouped_by_4(k15_files, sc_files, mask=0b101, show=True,
         data_128_only = np.copy(data)
         leave_128_only(data_128_only)
         data_128_only = get_sum_by_number_of_channels(data_128_only, 4)
-        filter_128(data)
+        filter_128(data, verbose=0)
         data = get_sum_by_number_of_channels(data, 4)
         list_of_data_k15[idx] = data
         list_of_128_from_k15[idx] = data_128_only
