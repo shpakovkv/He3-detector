@@ -146,6 +146,9 @@ def process_k15_and_sc(k15_file,
     # print(" until ")
     # print(datetime.datetime.fromtimestamp(int(data_sc[0, -1]), tz=TIMEZONE).strftime('%H:%M:%S'))
 
+    if cut_intervals:
+        data_sc = cut_out_all_intervals(data_sc, cut_intervals, verbose=0)
+
     rates_sc, err_rates_sc, gaps_sc = get_counting_rate(data_sc)
     rates_k15, err_rates_k15, gaps_k15 = get_counting_rate(data_k15)
 
