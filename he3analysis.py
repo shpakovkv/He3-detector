@@ -22,7 +22,7 @@ from dataclasses import dataclass
 DEFAULT_SEC_PER_RECORD = 1.025
 ERR_COEF = 1.1
 TIMEZONE = pytz.timezone("Etc/GMT+3")
-FILTER128_TOLERANCE = 0.20
+FILTER128_TOLERANCE = 0.25
 
 # minimum time step in the records
 MIN_TIME_STEP = 1
@@ -92,6 +92,7 @@ def get_filter128_relative_diff(below128_stats, above127_stats):
     :return: relative difference of mean value, minimum value and maximum value
     :rtype: tuple of float
     """
+    min_meaningful_value = 7
 
     if below128_stats.length == 0:
         return 1.0, 1.0, 1.0
@@ -104,10 +105,16 @@ def get_filter128_relative_diff(below128_stats, above127_stats):
 
     if below128_stats.mean > 0.0:
         mean_rel_diff = abs(below128_stats.mean - above127_stats.mean) / below128_stats.mean
+        if abs(below128_stats.mean - above127_stats.mean) < min_meaningful_value:
+            mean_rel_diff = 0
     if below128_stats.min > 0:
         min_rel_diff = abs(below128_stats.min - above127_stats.min) / below128_stats.min
+        if abs(below128_stats.min - above127_stats.min) < min_meaningful_value:
+            min_rel_diff = 0
     if below128_stats.max > 0:
         max_rel_diff = abs(below128_stats.max - above127_stats.max) / below128_stats.max
+        if abs(below128_stats.max - above127_stats.max) < min_meaningful_value:
+            max_rel_diff = 0
 
     return mean_rel_diff, min_rel_diff, max_rel_diff
 
@@ -673,25 +680,33 @@ def validate_filter128(data, verbose):
     valid_list = [True] * len(diff_list)
     for ch, diff_tuple in enumerate(diff_list):
         for idx, err in enumerate(diff_tuple):
-            if not isnan(err) and err > FILTER128_TOLERANCE:
+            if not isnan(err) and err >= 0.25:
                 valid_list[ch] = False
+
+                warn_level = 1
+                if err > 0.5:
+                    warn_level += 1
+                if err > 0.75:
+                    warn_level += 1
+                warn_symbol = '!' * warn_level
+                warn_lv_list = ["1st", "2nd", "3rd"]
                 if verbose > 2:
-                    print(f"Warning! CH[{ch}] {labels[idx]} value filter128 error ({err * 100:.2f}%) "
-                          f"has exceeded the allowable value ({FILTER128_TOLERANCE * 100}%)!")
+                    print(f"({warn_symbol}) Warning! CH[{ch + 1}] {labels[idx].upper()} value filter128 error ({err * 100:.2f}%) "
+                          f"has exceeded the {warn_lv_list[warn_level - 1]} allowable level ({25 * warn_level}%)!")
 
         if below128_stat_list[ch].length == 0:
             valid_list[ch] = False
             if verbose > 0:
-                print(f"(!!) ERROR! CH[{ch}] has NO VALUES below 128 and "
+                print(f"(!!!) ERROR! CH[{ch + 1}] has NO VALUES below 128 and "
                       f"{above127_stat_list[ch].length} values above 127!")
 
         if below128_stat_list[ch].max > 128.0 - FILTER128_TOLERANCE * 128.0 and above127_stat_list[ch].length > 0:
             if verbose > 0:
-                print(f"(!) WARNING! CH[{ch}] maximum value below 128 ({below128_stat_list[ch].max}) is bigger than "
+                print(f"(!) WARNING! CH[{ch + 1}] maximum value below 128 ({below128_stat_list[ch].max}) is bigger than "
                       f"the allowable value (128 - {FILTER128_TOLERANCE * 100}%)!")
     if verbose > 0:
         if not all(valid_list):
-            print(f"(!) WARNING! filter128 operation error has exceeded the allowable value "
+            print(f"WARNING! filter128 operation error has exceeded the allowable value "
                   f"{FILTER128_TOLERANCE * 100}% for {len(valid_list) - sum(valid_list)} channel(s)")
 
     if verbose > 1:
