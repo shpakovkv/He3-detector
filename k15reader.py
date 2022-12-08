@@ -23,24 +23,6 @@ SC_VAL_POS = {"voltage": 0, "current": 2}
 TIMEZONE = pytz.timezone("Etc/GMT+3")
 
 
-def get_file_list(path, sort_by_name=False, sort_by_ctime=False):
-    """Returns a list of all files
-    contained in the folder (path).
-    Each element of the returned list is a full path to the file
-
-    path -- target directory.
-    sort -- by default, the list of results is sorted
-            by creation time.
-    """
-    target_files = [os.path.join(path, x) for x in os.listdir(path)
-                    if os.path.isfile(os.path.join(path, x))]
-    if sort_by_name:
-        target_files.sort()
-    if sort_by_ctime:
-        target_files.sort(key=lambda x: os.path.getctime(x))
-    return target_files
-
-
 def get_raw_lines(filename):
     lines = None
     with open(filename, 'r') as fid:

@@ -36,6 +36,30 @@ class Stats:
     min: float = nan
 
 
+def get_time_str(timestamp):
+    """Returns time string in "%H:%M:%S" format.
+
+    :param timestamp: time in timestamp format
+    :type timestamp: float
+    :return: time in "%H:%M:%S" format
+    :rtype: str
+    """
+    val_str = datetime.fromtimestamp(timestamp).strftime("%H:%M:%S")
+    return val_str
+
+
+def get_datetime_str(timestamp):
+    """Returns date and time string in "%Y.%m.%d %H:%M:%S" format.
+
+    :param timestamp: time in timestamp format
+    :type timestamp: float
+    :return: time in "%Y.%m.%d %H:%M:%S" format
+    :rtype: str
+    """
+    val_str = datetime.fromtimestamp(timestamp).strftime("%Y.%m.%d %H:%M:%S")
+    return val_str
+
+
 def get_vector_stats(array_1d):
     """Calculates array Stats (length, mean, max, min).
 
@@ -383,6 +407,11 @@ def _get_interval_idx(data, interval):
     # search time[stop - 1] <= interval[1]
     stop = np.searchsorted(data[0], interval[1], side='right')
     stop -= 1
+
+    # interval between two points == nothing to cut
+    if stop < start:
+        return None, None
+
     return start, stop
 
 

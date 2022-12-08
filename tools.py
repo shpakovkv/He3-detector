@@ -170,10 +170,10 @@ def process_k15_and_sc(k15_file,
         write_data(data_k15, base_out_name, group_by_sec, verbose)
 
     if make_graph:
-        make_k15_graph(data_k15, group_by_4, group_by_sec, base_out_name, save_graph, show_graph,
-                       save_dir=save_graph_to,
-                       col_mask=col_mask,
-                       verbose=verbose)
+        # make_k15_graph(data_k15, group_by_4, group_by_sec, base_out_name, save_graph, show_graph,
+        #                save_dir=save_graph_to,
+        #                col_mask=col_mask,
+        #                verbose=verbose)
         if data_sc_average is None:
             # rates == list of avgs for all channels
             cols = data_sc.shape[0]
