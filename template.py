@@ -274,6 +274,7 @@ def process01(path_k15, path_sc, save_timeline_as, k15_time_shift,
                         show_graph=show_graph,
                         col_mask=k15_col_mask,
                         cut_intervals=cut_list,
+                        shift_k15_seconds=k15_time_shift,
                         verbose=0)
 
     for filename in file_list_k15[:1]:
@@ -287,6 +288,7 @@ def process01(path_k15, path_sc, save_timeline_as, k15_time_shift,
                         show_graph=False,
                         col_mask=k15_col_mask,
                         cut_intervals=cut_list,
+                        shift_k15_seconds=k15_time_shift,
                         verbose=verbose)
 
     print()

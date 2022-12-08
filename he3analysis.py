@@ -128,15 +128,15 @@ def get_filter128_relative_diff(below128_stats, above127_stats):
     max_rel_diff = nan
 
     if below128_stats.mean > 0.0:
-        mean_rel_diff = abs(below128_stats.mean - above127_stats.mean) / below128_stats.mean
+        mean_rel_diff = abs(below128_stats.mean - above127_stats.mean) / float(below128_stats.mean)
         if abs(below128_stats.mean - above127_stats.mean) < min_meaningful_value:
             mean_rel_diff = 0
     if below128_stats.min > 0:
-        min_rel_diff = abs(below128_stats.min - above127_stats.min) / below128_stats.min
+        min_rel_diff = abs(below128_stats.min - above127_stats.min) / float(below128_stats.min)
         if abs(below128_stats.min - above127_stats.min) < min_meaningful_value:
             min_rel_diff = 0
     if below128_stats.max > 0:
-        max_rel_diff = abs(below128_stats.max - above127_stats.max) / below128_stats.max
+        max_rel_diff = abs(below128_stats.max - above127_stats.max) / float(below128_stats.max)
         if abs(below128_stats.max - above127_stats.max) < min_meaningful_value:
             max_rel_diff = 0
 
@@ -624,7 +624,8 @@ def get_counting_rate(data, sec_per_record=DEFAULT_SEC_PER_RECORD):
     # number of records made during time_spent
     records_num = data.shape[1] - 1
 
-    real_sec_per_record = duration / records_num
+    # duration of one record
+    real_sec_per_record = duration / (records_num - 1)
 
     res = list()
     std_dev = list()
@@ -642,6 +643,23 @@ def get_counting_rate(data, sec_per_record=DEFAULT_SEC_PER_RECORD):
             intervals.append([start, idx - 1])
             there_are_gaps.append(data[0, idx] - data[0, idx - 1])
             start = idx
+
+    # TODO: add real time per record calculation
+    # if len(intervals) > 0:
+    #     real_sec_per_record = 0
+    #     # the end of previous record
+    #     rec_start = data[0, 0]
+    #     prev_rec_idx = -1
+    #     single_points = 0
+    #     for idx, time_pair in enumerate(intervals):
+    #         gap_start_idx, gap_stop_idx = time_pair
+    #         if data[0, gap_start_idx] - rec_start
+    #
+    #         real_sec_per_record += (data[0, gap_start_idx] - rec_start) *
+    #         prev_rec_idx = gap_stop_idx
+    #         rec_start = data[0, gap_stop_idx]
+
+
     for row in range(1, data.shape[0]):
         rate = sum(data[row, :]) / float(records_num)
         res.append(rate)
