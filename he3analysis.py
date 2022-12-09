@@ -17,7 +17,7 @@ from datetime import datetime
 from datetime import timezone
 from math import isnan, nan
 import pytz
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 DEFAULT_SEC_PER_RECORD = 1.025
 ERR_COEF = 1.1
@@ -30,10 +30,12 @@ MIN_TIME_STEP = 1
 
 @dataclass
 class Stats:
-    length: int
+    # field index 0(mean), 1(min), 2(max) is used in validate_filter128() !!
+    # do not change field order
     mean: float = nan
-    max: float = nan
     min: float = nan
+    max: float = nan
+    length: int = 0
 
 
 def get_time_str(timestamp):
@@ -737,9 +739,12 @@ def validate_filter128(data, verbose):
                     warn_level += 1
                 warn_symbol = '!' * warn_level
                 warn_lv_list = ["1st", "2nd", "3rd"]
+                attr = fields(Stats)[idx]
                 if verbose > 1:
-                    print(f"({warn_symbol}) Warning! CH[{ch + 1}] {labels[idx].upper()} value filter128 error ({err * 100:.2f}%) "
-                          f"has exceeded the {warn_lv_list[warn_level - 1]} allowable level ({25 * warn_level}%)!")
+                    print(
+                        f"({warn_symbol}) Warning! CH[{ch + 1}] {labels[idx].upper()} value filter128 error ({err * 100:.2f}%) "
+                        f"({getattr(above127_stat_list[ch], attr.name)} vs {getattr(below128_stat_list[ch], attr.name)}) "
+                        f"has exceeded the {warn_lv_list[warn_level - 1]} allowable level ({25 * warn_level}%)!")
 
         if below128_stat_list[ch].length == 0:
             valid_list[ch] = False
