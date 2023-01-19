@@ -179,7 +179,7 @@ def make_2022_10_03():
 def process01(path_k15, path_sc, save_timeline_as, k15_time_shift,
               k15_group4=True, sc_group4=False, filter128=True, cut_list=None,
               force_timeline=False, show_graph=False, save_graph=True,
-              check=True, verbose=2):
+              check=True, number_of_bg_files=1, verbose=2):
     """
     Process k15 data with SlowControl data,
     make k15 graphs,
@@ -232,6 +232,10 @@ def process01(path_k15, path_sc, save_timeline_as, k15_time_shift,
     :type save_graph: bool
     :param check: if true makes data skipping and record interval stability check graph
     :type check: bool
+    :param number_of_bg_files: number of files with background data
+                               (will be processed without SlowControl),
+                               all bg-files must be at the beginning of the file list
+    :type number_of_bg_files: int
     :param verbose: level of verbosity
     :type verbose: int
     :return: None
@@ -277,7 +281,7 @@ def process01(path_k15, path_sc, save_timeline_as, k15_time_shift,
                         shift_k15_seconds=k15_time_shift,
                         verbose=0)
 
-    for filename in file_list_k15[:1]:
+    for filename in file_list_k15[:number_of_bg_files]:
         file_processing(filename,
                         filter128=filter128,
                         group_by_4=sc_group4,
@@ -296,7 +300,7 @@ def process01(path_k15, path_sc, save_timeline_as, k15_time_shift,
 
     # make k15 with SlowControl data graph
     # skip first file (usually background without SlowControl data)
-    for filename in file_list_k15[1:]:
+    for filename in file_list_k15[number_of_bg_files:]:
         process_k15_and_sc(filename,
                            file_list_sc,
                            filter128=filter128,
