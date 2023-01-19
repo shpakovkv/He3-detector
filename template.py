@@ -260,7 +260,7 @@ def process01(path_k15, path_sc, save_timeline_as, k15_time_shift,
     # make TimeLine graph once if not found
     timeline_exist = any(fname.startswith(save_timeline_as) for fname in get_file_list(os.path.dirname(save_timeline_as)))
     if not timeline_exist or force_timeline:
-        make_timeline_graph_grouped_by_4(file_list_k15[1:],
+        make_timeline_graph_grouped_by_4(file_list_k15[number_of_bg_files:],
                                          file_list_sc,
                                          mask=0b101,
                                          show=True,
