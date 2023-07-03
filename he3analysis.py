@@ -447,16 +447,8 @@ def print_k15_rates(data, rates, err_rates, gaps, group_by_4, verbose):
         print("Присутствуют пропуски ({} шт) длительностью: {} сек"
               "".format(len(gaps), gaps))
 
-    # time spent from 1st record to last
-    # (!!) registration time of the 1st event is not included
-    time_spent = data[0, -1] - data[0, 0]
+    real_time_per_record, err_real_time_per_records = get_real_time_per_record(data)
 
-    # number of records made during time_spent
-    records_num = data.shape[1] - 1
-
-    real_time_per_record = time_spent / records_num
-
-    err_real_time_per_records = (time_spent + 2) / records_num - real_time_per_record
     if real_time_per_record > DEFAULT_SEC_PER_RECORD * ERR_COEF:
         print("WARNING! Calculated time-per-record {:.4f} significantly exceeds the default value {:.4f}."
               "".format(real_time_per_record, DEFAULT_SEC_PER_RECORD))
@@ -646,24 +638,13 @@ def get_counting_rate(data, sec_per_record=DEFAULT_SEC_PER_RECORD):
             there_are_gaps.append(data[0, idx] - data[0, idx - 1])
             start = idx
 
-    # TODO: add real time per record calculation
-    # if len(intervals) > 0:
-    #     real_sec_per_record = 0
-    #     # the end of previous record
-    #     rec_start = data[0, 0]
-    #     prev_rec_idx = -1
-    #     single_points = 0
-    #     for idx, time_pair in enumerate(intervals):
-    #         gap_start_idx, gap_stop_idx = time_pair
-    #         if data[0, gap_start_idx] - rec_start
-    #
-    #         real_sec_per_record += (data[0, gap_start_idx] - rec_start) *
-    #         prev_rec_idx = gap_stop_idx
-    #         rec_start = data[0, gap_stop_idx]
-
+    real_time_per_record, _ = get_real_time_per_record(data)
 
     for row in range(1, data.shape[0]):
+        # calc rate per record
         rate = sum(data[row, :]) / float(records_num)
+        # recalc rate per second
+        rate *= real_time_per_record
         res.append(rate)
         std_dev.append(np.std(data[row, :] / float(records_num)))
     return res, std_dev, there_are_gaps
@@ -842,6 +823,30 @@ def get_sc_ibounds(k15_data, sc_data):
             break
     # last bound is not included
     return start_sc_idx, stop_sc_idx
+
+
+def get_real_time_per_record(k15_data):
+    """ Calculates time-per-record value in seconds
+    for k15 data.
+
+    WARNING! Time gaps in data are not handled!
+
+    # TODO: handle time gaps in records
+
+    :param k15_data: k15 data
+    :type k15_data: np.ndarray
+    :return: tuple with time-per-record value and error of its calculation in seconds
+    :rtype: tuple of float
+    """
+    time_spent = k15_data[0, -1] - k15_data[0, 0]
+
+    # number of records made during time_spent
+    records_num = k15_data.shape[1] - 1
+    real_time_per_record = time_spent / float(records_num)
+
+    err_real_time_per_records = (time_spent + 2) / records_num - real_time_per_record
+
+    return real_time_per_record, err_real_time_per_records
 
 
 def check_bounds(start_k15_time, stop_k15_time, start_sc_time, stop_sc_time):
